@@ -120,37 +120,93 @@ CI (`.github/workflows/build.yml`) runs typecheck, `npm test` (TZ=Europe/Berlin)
 and `cargo test -p mwmaster-core` on Ubuntu, then builds Windows ARM64,
 Windows x64 and macOS universal.
 
-## Releases
+## Releases and updates
 
-1. Bump the version in **all three** places, identical:
-   `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`
-   (then `npm install --package-lock-only` and `cargo check` to refresh the lock files).
-2. Commit, `git tag vX.Y.Z`, `git push origin main --tags`.
-3. CI creates a draft release, uploads the installers of all three
-   platforms and publishes it.
+Max asks Claude Code for releases ("mach ein Update", "neue Version").
+**Always confirm the version number with Max before tagging** — a pushed
+tag goes out to his friends as an update.
+
+### How updates reach users
+
+- Installed apps check
+  `https://github.com/massimomassivo/mw-master-app/releases/latest/download/latest.json`
+  on start (and via Einstellungen → "Nach Updates suchen").
+- Only a **published GitHub release with a higher version** reaches
+  installed apps. Pushes to `main` without a tag just build workflow
+  artifacts (logged-in only, expire after 90 days) — nobody gets those.
+- Shared data (catalog, Notenspiegel) never needs a release; it comes via
+  the shared folder. Only app code/schema changes do.
+- Not every commit needs a release; batch changes and release when useful.
+- User data (SQLite in the app data dir) survives updates and reinstalls.
+
+### Versioning (semver `MAJOR.MINOR.PATCH`)
+
+- PATCH (0.1.0 → 0.1.1): bug fixes only.
+- MINOR (0.1.x → 0.2.0): new features, visible UI changes, new optional
+  shared-data fields, DB migrations.
+- MAJOR: 1.0 when Max considers it stable, or breaking changes
+  (e.g. shared-data schema MAJOR).
+- Never reuse, move or delete a published tag. A broken release is fixed
+  by the next PATCH release.
+
+### Release procedure
+
+1. `git pull` first — Max or Claude sometimes commit on github.com.
+2. `npm test`, `cargo test -p mwmaster-core` and `npm run build` pass;
+   last CI run on `main` is green.
+3. Bump the version **identically in all three** places:
+   `package.json`, `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`,
+   then `npm install --package-lock-only` and `cargo check` to refresh
+   `package-lock.json` and `Cargo.lock`.
+4. Commit `Release vX.Y.Z`, then:
+   ```bash
+   git tag vX.Y.Z
+   git push origin main
+   git push origin vX.Y.Z
+   ```
+5. CI (`.github/workflows/build.yml`) on the tag: test → create-release
+   (draft "MW Master vX.Y.Z") → build Windows ARM64, Windows x64, macOS
+   universal, sign the update bundles, upload installers + `latest.json`
+   → publish-release. Takes ~7 min. Watch it with `gh run watch` if
+   `gh` is installed, otherwise GitHub → Actions.
+6. Check the release (`gh release view vX.Y.Z` or the web page): two
+   `*-setup.exe` (x64, arm64), the `.dmg`, the `.sig` files and
+   `latest.json` with the new version.
+7. Optional release notes: the workflow writes a fixed body (install
+   hints). Add a short German changelog afterwards with
+   `gh release edit vX.Y.Z --notes "..."` or on the web page.
+
+**Never create a release in the GitHub web UI ("Draft a new release").**
+That creates tag and release at once; the workflow's create-release job
+then fails (only one release per tag) and no installers are built. Only
+push the tag.
 
 A local Windows build: `npm run tauri build` → installer in
-`target/release/bundle/nsis/` (workspace root `target/`).
+`target/release/bundle/nsis/` (workspace root `target/`). With
+`createUpdaterArtifacts: true` this needs `TAURI_SIGNING_PRIVATE_KEY`
+(+ password) in the environment; for a quick local test without signing,
+pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
 
-### In-app updater (enabled 2026-10-12)
+### In-app updater and signing (enabled 2026-10-12)
 
-The updater is active (Einstellungen → "Nach Updates suchen"). The signing
-key lives only on Max' machine (`~/.tauri/mw-master.key`, with a password);
-the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` and
-`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are set, `tauri.conf.json` has the
-pubkey, the `massimomassivo` endpoint and `createUpdaterArtifacts: true`.
-If the key is lost, installed apps cannot accept updates any more.
-
-How it was set up (for reference):
-
-1. `npx tauri signer generate -w ~/.tauri/mw-master.key` — keep the key
-   file and password private, **never commit it**.
-2. GitHub repo → Settings → Secrets → Actions: `TAURI_SIGNING_PRIVATE_KEY`
-   (content of the key file) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
-3. `src-tauri/tauri.conf.json`: set `plugins.updater.pubkey` to the content
-   of `mw-master.key.pub`, replace `OWNER` in the endpoint with the GitHub
-   user, set `bundle.createUpdaterArtifacts` to `true`.
-4. Release as above; the release then contains `latest.json`.
+- The signing key lives only on Max' machine: `~/.tauri/mw-master.key`
+  (password protected) and `mw-master.key.pub`. **Never commit, print or
+  copy the private key.** Max keeps a backup in his password manager.
+- GitHub → Settings → Secrets → Actions: `TAURI_SIGNING_PRIVATE_KEY`
+  (key file content) and `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`.
+- `src-tauri/tauri.conf.json`: `plugins.updater.pubkey` = content of
+  `mw-master.key.pub`, endpoint with `massimomassivo`,
+  `bundle.createUpdaterArtifacts: true`. Don't change the pubkey —
+  installed apps would reject every later update.
+- v0.1.0 is the first release with the updater. Installs before it don't
+  exist.
+- Troubleshooting: `failed to decode base64 secret key: Invalid symbol 10`
+  in CI means the secret has a newline. Max re-copies it with
+  `(Get-Content $HOME\.tauri\mw-master.key -Raw) -replace '\s','' | Set-Clipboard`,
+  updates the secret, then re-run the failed jobs. A wrong password fails
+  at the same signing step.
+- If the key is ever lost: generate a new one, update secrets and pubkey;
+  every user must install the next version manually once.
 
 No paid code-signing certificates: Windows SmartScreen and macOS Gatekeeper
 show a warning on first start (README explains the click path). The updater
