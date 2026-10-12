@@ -132,10 +132,16 @@ Windows x64 and macOS universal.
 A local Windows build: `npm run tauri build` → installer in
 `target/release/bundle/nsis/` (workspace root `target/`).
 
-### Enabling the in-app updater (one-time, not done yet)
+### In-app updater (enabled 2026-10-12)
 
-The updater plugin is wired (Einstellungen → "Nach Updates suchen") but
-inactive until signing is set up:
+The updater is active (Einstellungen → "Nach Updates suchen"). The signing
+key lives only on Max' machine (`~/.tauri/mw-master.key`, with a password);
+the GitHub secrets `TAURI_SIGNING_PRIVATE_KEY` and
+`TAURI_SIGNING_PRIVATE_KEY_PASSWORD` are set, `tauri.conf.json` has the
+pubkey, the `massimomassivo` endpoint and `createUpdaterArtifacts: true`.
+If the key is lost, installed apps cannot accept updates any more.
+
+How it was set up (for reference):
 
 1. `npx tauri signer generate -w ~/.tauri/mw-master.key` — keep the key
    file and password private, **never commit it**.
@@ -152,7 +158,6 @@ signature is independent of that.
 
 ## Open / next steps
 
-- Enable the updater (above) once the GitHub repo exists.
 - First real release and a test install on Windows x64 and macOS.
 - App icon is a placeholder (`assets/icon-source.png` → `npx tauri icon assets/icon-source.png -o src-tauri/icons`,
   then delete the generated `android/` and `ios/` folders).
