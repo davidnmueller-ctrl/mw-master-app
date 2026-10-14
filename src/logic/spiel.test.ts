@@ -17,6 +17,7 @@ const B = (kategorie: string, cp: number, status: Belegung["status"], note: numb
   status,
   note100: note == null ? null : Math.round(note * 100),
   notiz: "",
+  eigenerTermin: null,
   sortOrder: 0,
   createdAt: 0,
   updatedAt: 0,

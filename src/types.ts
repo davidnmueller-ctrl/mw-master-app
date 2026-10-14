@@ -11,6 +11,16 @@ export interface Manifest {
   fpso?: string;
   anzahlModule?: number;
   hinweis?: string;
+  /** Exam date files (schema 1.3). Missing = no exam data. */
+  pruefungen?: ManifestPruefung[];
+}
+
+/** One entry of manifest.pruefungen (schema 1.3). */
+export interface ManifestPruefung {
+  semester: string;
+  /** Path relative to the shared root, e.g. "pruefungen/WS26-27.json". */
+  datei: string;
+  updatedAt: string;
 }
 
 export interface Unterbereich {
@@ -109,6 +119,63 @@ export interface Modul {
   quellen?: string[];
 }
 
+/** One exam date from pruefungen/<SEMESTER>.json (schema 1.3, docs/ANFORDERUNGEN.md 5.6). */
+export interface PruefungsTermin {
+  /** "<code>-<YYYY><W|S>-<n>", unique in the file; used as ICS UID. */
+  id: string;
+  /** Catalog code (exam number without suffix). */
+  code: string;
+  pruefungsnummer?: string;
+  titel?: string;
+  art?: string;
+  vorbehaltlich?: boolean;
+  /** ISO date, or null when TUMonline gives none (e.g. "nach Absprache"). */
+  datum: string | null;
+  /** Last day of a multi-day exam. */
+  datumBis?: string;
+  beginn?: string | null;
+  ende?: string | null;
+  raeume?: string[];
+  pruefer?: string[];
+  anmeldungVon?: string;
+  anmeldungBis?: string;
+  abmeldungBis?: string;
+  /** Same string = parallel groups of one module; one of them is written. */
+  alternativGruppe?: string | null;
+  hinweis?: string | null;
+}
+
+export interface PruefungsDatei {
+  semester: string;
+  stand: string;
+  quelle?: string;
+  termine: PruefungsTermin[];
+}
+
+/** Cached exam data of one semester (kv "cache:pruefungen"). */
+export interface PruefungsSemester extends PruefungsDatei {
+  datei: string;
+  /** updatedAt from the manifest entry this file was read for. */
+  updatedAt: string;
+  gelesenAm: string;
+}
+
+/** Cached exam data per semester, keyed by semester ("WS 26/27"). */
+export type PruefungsCache = Record<string, PruefungsSemester>;
+
+/** Per-semester line of the import report (Einstellungen, 4.6). */
+export interface PruefungsBericht {
+  semester: string;
+  datei: string;
+  /** "neu" = read now, "unveraendert" = updatedAt same as cache, "fehler" = kept old/none. */
+  zustand: "neu" | "unveraendert" | "fehler";
+  fehler?: string;
+  stand: string | null;
+  anzahl: number;
+  /** Codes in the file that are not in the catalog (entries skipped). */
+  unbekannteCodes: string[];
+}
+
 export interface SharedData {
   manifest: Manifest;
   regeln: Regeln;
@@ -143,9 +210,20 @@ export interface Belegung {
   /** Grade in hundredths (1,3 -> 130); null = no grade. */
   note100: number | null;
   notiz: string;
+  /** Own exam date; overrides shared dates and estimates (4.1, 4.8). */
+  eigenerTermin: EigenerTermin | null;
   sortOrder: number;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface EigenerTermin {
+  /** ISO date. */
+  datum: string;
+  /** "HH:MM" or null. */
+  beginn: string | null;
+  ende: string | null;
+  raum: string | null;
 }
 
 export interface SpielZeile {
@@ -172,6 +250,8 @@ export interface Settings {
   sharedPath: string | null;
   backupDir: string | null;
   einrichtungFertig: boolean;
+  /** Exam conflicts: "yellow" up to this many calendar days apart (0 = off, max 7). */
+  gelbGrenze: number;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -180,6 +260,41 @@ export const DEFAULT_SETTINGS: Settings = {
   sharedPath: null,
   backupDir: null,
   einrichtungFertig: false,
+  gelbGrenze: 2,
+};
+
+/** Saved state of the "Prüfungen" view (kv "pruefungsansicht", 4.8). */
+export interface PruefungsAnsicht {
+  /** Selected semester; null = choose automatically. */
+  semester: string | null;
+  modus: "monat" | "woche" | "liste";
+  grundlage: "plan" | "alle";
+  /** With "alle": always show the plan's modules, other filters only apply outside the plan. */
+  planImmer: boolean;
+  /** Tag ids (OR); empty = all. */
+  tags: string[];
+  /** Category ids (module's allowed categories); empty = all. */
+  kategorien: string[];
+  /** "" = all, otherwise "WS" / "SS" (WS+SS matches both) or "unregelmaessig". */
+  turnus: string;
+  /** With "alle": show repeat exams (always shown for "plan"). */
+  wiederholungen: boolean;
+  schaetzungen: boolean;
+  /** With "alle": hide modules outside the plan that would conflict with it. */
+  nurKonfliktfrei: boolean;
+}
+
+export const DEFAULT_PRUEFUNGS_ANSICHT: PruefungsAnsicht = {
+  semester: null,
+  modus: "monat",
+  grundlage: "plan",
+  planImmer: true,
+  tags: [],
+  kategorien: [],
+  turnus: "",
+  wiederholungen: false,
+  schaetzungen: true,
+  nurKonfliktfrei: false,
 };
 
 export const STATUS_LABEL: Record<Status, string> = {

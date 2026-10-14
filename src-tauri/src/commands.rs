@@ -64,6 +64,12 @@ pub async fn shared_read(path: String) -> Res<SharedRead> {
     shared::read_all(&PathBuf::from(path))
 }
 
+/// Read single exam date files from the shared folder (read-only).
+#[tauri::command]
+pub async fn shared_read_files(path: String, names: Vec<String>) -> Res<SharedRead> {
+    shared::read_files(&PathBuf::from(path), &names)
+}
+
 // ---------------- backup ----------------
 
 /// Write the private data as JSON into `dir`. Returns the file path.

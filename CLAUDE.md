@@ -101,7 +101,8 @@ examples/shared/        invented sample data (browser mode + tests)
 docs/ANFORDERUNGEN.md   product spec (German)
 ```
 
-kv keys: `settings`, `spiel`, `notizen`, `cache:shared`. Keys starting with
+kv keys: `settings`, `spiel`, `notizen`, `pruefungsansicht`, `cache:shared`,
+`cache:pruefungen`. Keys starting with
 `cache:` are excluded from backups and survive a restore.
 
 ## Tests and checks

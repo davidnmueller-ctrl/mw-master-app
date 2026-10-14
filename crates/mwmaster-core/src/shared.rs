@@ -83,6 +83,39 @@ pub fn read_all(path: &Path) -> Result<SharedRead, String> {
     Ok(SharedRead { root: root.to_string_lossy().to_string(), files, errors })
 }
 
+/// Whether `name` is an exam date file as listed in manifest.pruefungen:
+/// "pruefungen/WS26-27.json" or "pruefungen/SS26.json" (schema 1.3). Nothing
+/// else may be read through `read_files`, so a manifest cannot point the app
+/// at files outside the shared folder.
+pub fn is_pruefungen_file(name: &str) -> bool {
+    let Some(stem) = name.strip_prefix("pruefungen/").and_then(|n| n.strip_suffix(".json")) else {
+        return false;
+    };
+    let b = stem.as_bytes();
+    let digits = |s: &[u8]| s.iter().all(u8::is_ascii_digit);
+    match b {
+        [b'W', b'S', y1, y2, b'-', z1, z2] => digits(&[*y1, *y2, *z1, *z2]),
+        [b'S', b'S', y1, y2] => digits(&[*y1, *y2]),
+        _ => false,
+    }
+}
+
+/// Read single exam date files (only those whose `updatedAt` changed).
+/// Names that are not exam date files are reported as errors, not read.
+pub fn read_files(path: &Path, names: &[String]) -> Result<SharedRead, String> {
+    let root = resolve_root(path).ok_or_else(|| no_manifest(path))?;
+    let mut files = Vec::new();
+    let mut errors = Vec::new();
+    for name in names {
+        if is_pruefungen_file(name) {
+            read_into(&root.join(name), name, &mut files, &mut errors);
+        } else {
+            errors.push(FileError { name: name.clone(), error: "kein gültiger Name einer Prüfungsdatei".into() });
+        }
+    }
+    Ok(SharedRead { root: root.to_string_lossy().to_string(), files, errors })
+}
+
 fn read_into(path: &Path, name: &str, files: &mut Vec<SharedFile>, errors: &mut Vec<FileError>) {
     match std::fs::read_to_string(path) {
         // Strip a UTF-8 BOM some Windows editors add.
@@ -146,6 +179,43 @@ mod tests {
         assert_eq!(r.files.len(), 1);
         let err_names: Vec<_> = r.errors.iter().map(|e| e.name.as_str()).collect();
         assert_eq!(err_names, vec!["regeln.json", "tags.json", "module/"]);
+    }
+
+    #[test]
+    fn exam_file_names() {
+        assert!(is_pruefungen_file("pruefungen/WS26-27.json"));
+        assert!(is_pruefungen_file("pruefungen/SS26.json"));
+        for bad in [
+            "pruefungen/../manifest.json",
+            "pruefungen/WS26-27.txt",
+            "module/XX0001.json",
+            "pruefungen/WS2627.json",
+            "pruefungen/SS2.json",
+            "../pruefungen/SS26.json",
+            "pruefungen/ss26.json",
+        ] {
+            assert!(!is_pruefungen_file(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn reads_only_requested_exam_files() {
+        let tmp = tempfile::tempdir().unwrap();
+        make_shared(tmp.path());
+        fs::create_dir_all(tmp.path().join("pruefungen")).unwrap();
+        fs::write(tmp.path().join("pruefungen").join("SS26.json"), "\u{feff}{}").unwrap();
+        fs::write(tmp.path().join("pruefungen").join("WS26-27.json"), "{\"x\":1}").unwrap();
+        let names = vec![
+            "pruefungen/SS26.json".to_string(),
+            "pruefungen/WS25-26.json".to_string(),
+            "regeln.json".to_string(),
+        ];
+        let r = read_files(tmp.path(), &names).unwrap();
+        assert_eq!(r.files, vec![SharedFile { name: "pruefungen/SS26.json".into(), content: "{}".into() }]);
+        let err_names: Vec<_> = r.errors.iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(err_names, vec!["pruefungen/WS25-26.json", "regeln.json"]);
+        // read_all does not pick up exam files.
+        assert!(read_all(tmp.path()).unwrap().files.iter().all(|f| !f.name.starts_with("pruefungen/")));
     }
 
     #[test]

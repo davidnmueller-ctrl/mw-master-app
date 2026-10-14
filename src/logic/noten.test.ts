@@ -151,6 +151,7 @@ test("deadline: one G/K/A module by the end of the 2nd semester", () => {
     status,
     note100: 200,
     notiz: "",
+    eigenerTermin: null,
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,

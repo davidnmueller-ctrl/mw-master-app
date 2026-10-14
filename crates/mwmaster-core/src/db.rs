@@ -42,12 +42,30 @@ pub struct Belegung {
     pub note100: Option<i64>,
     #[serde(default)]
     pub notiz: String,
+    /// Own exam date (private). Overrides the shared exam dates and the
+    /// estimate for this record (docs/ANFORDERUNGEN.md 4.1, 4.8).
+    #[serde(default)]
+    pub eigener_termin: Option<EigenerTermin>,
     #[serde(default)]
     pub sort_order: i64,
     #[serde(default)]
     pub created_at: i64,
     #[serde(default)]
     pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct EigenerTermin {
+    /// ISO date "YYYY-MM-DD".
+    pub datum: String,
+    /// "HH:MM" or None.
+    #[serde(default)]
+    pub beginn: Option<String>,
+    #[serde(default)]
+    pub ende: Option<String>,
+    #[serde(default)]
+    pub raum: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -71,7 +89,13 @@ pub struct Db {
 /// Schema version written into snapshots. When the stored shape changes, bump
 /// it and upgrade older snapshots in `upgrade_snapshot` instead of relying on
 /// serde defaults, which drop unknown fields silently.
-pub const SCHEMA_VERSION: i64 = 1;
+///
+/// 1: first version.
+/// 2: Belegung.eigenerTermin, settings.gelbGrenze (exam dates, v0.3).
+pub const SCHEMA_VERSION: i64 = 2;
+
+/// Default for settings.gelbGrenze (exam conflicts, docs/ANFORDERUNGEN.md 4.6).
+pub const DEFAULT_GELB_GRENZE: i64 = 2;
 
 /// kv keys with this prefix hold data that can be rebuilt (the cache of the
 /// shared folder). They are left out of backups and survive a restore.
@@ -93,6 +117,10 @@ CREATE TABLE IF NOT EXISTS belegungen (
     status       TEXT NOT NULL,
     note100      INTEGER,
     notiz        TEXT NOT NULL DEFAULT '',
+    termin_datum  TEXT,
+    termin_beginn TEXT,
+    termin_ende   TEXT,
+    termin_raum   TEXT,
     sort_order   INTEGER NOT NULL DEFAULT 0,
     created_at   INTEGER NOT NULL DEFAULT 0,
     updated_at   INTEGER NOT NULL DEFAULT 0
@@ -100,16 +128,51 @@ CREATE TABLE IF NOT EXISTS belegungen (
 CREATE INDEX IF NOT EXISTS idx_belegungen_semester ON belegungen(semester);
 "#;
 
-/// Schema migrations go here. Detect the old shape from the actual columns
-/// (see the Pomodoro app for the pattern) and alter the tables in place.
-fn migrate(_conn: &Connection) -> Result<()> {
+fn columns(conn: &Connection, table: &str) -> Result<Vec<String>> {
+    let mut st = conn.prepare(&format!("PRAGMA table_info({table})"))?;
+    let cols = st.query_map([], |r| r.get::<_, String>(1))?;
+    Ok(cols.collect::<rusqlite::Result<Vec<_>>>()?)
+}
+
+/// Schema migrations. The old shape is detected from the actual columns and
+/// the tables are altered in place, so every older database opens.
+fn migrate(conn: &Connection) -> Result<()> {
+    // v0.3: own exam date per Belegung.
+    let cols = columns(conn, "belegungen")?;
+    for col in ["termin_datum", "termin_beginn", "termin_ende", "termin_raum"] {
+        if !cols.iter().any(|c| c == col) {
+            conn.execute_batch(&format!("ALTER TABLE belegungen ADD COLUMN {col} TEXT"))?;
+        }
+    }
     Ok(())
 }
 
+/// Bring an older backup up to SCHEMA_VERSION.
 fn upgrade_snapshot(mut snap: Snapshot) -> Snapshot {
-    // Version 1 is the first one; nothing to upgrade yet.
+    if snap.version < 2 {
+        // 1 -> 2: no own exam dates yet; settings get the default yellow limit.
+        for b in &mut snap.belegungen {
+            b.eigener_termin = None;
+        }
+        for (k, v) in &mut snap.kv {
+            if k != "settings" {
+                continue;
+            }
+            if let Ok(serde_json::Value::Object(mut obj)) = serde_json::from_str::<serde_json::Value>(v) {
+                obj.entry("gelbGrenze").or_insert(DEFAULT_GELB_GRENZE.into());
+                *v = serde_json::Value::Object(obj).to_string();
+            }
+        }
+    }
     snap.version = SCHEMA_VERSION;
     snap
+}
+
+fn termin_cols(t: &Option<EigenerTermin>) -> [Option<String>; 4] {
+    match t {
+        Some(t) => [Some(t.datum.clone()), t.beginn.clone(), t.ende.clone(), t.raum.clone()],
+        None => [None, None, None, None],
+    }
 }
 
 impl Db {
@@ -157,6 +220,11 @@ impl Db {
     // ---------------- belegungen ----------------
 
     fn row_belegung(r: &Row) -> rusqlite::Result<Belegung> {
+        let datum: Option<String> = r.get(13)?;
+        let eigener_termin = match datum {
+            Some(datum) => Some(EigenerTermin { datum, beginn: r.get(14)?, ende: r.get(15)?, raum: r.get(16)? }),
+            None => None,
+        };
         Ok(Belegung {
             id: r.get(0)?,
             modul_code: r.get(1)?,
@@ -168,6 +236,7 @@ impl Db {
             status: r.get(7)?,
             note100: r.get(8)?,
             notiz: r.get(9)?,
+            eigener_termin,
             sort_order: r.get(10)?,
             created_at: r.get(11)?,
             updated_at: r.get(12)?,
@@ -177,7 +246,8 @@ impl Db {
     pub fn list_belegungen(&self) -> Result<Vec<Belegung>> {
         let mut st = self.conn.prepare(
             "SELECT id, modul_code, titel, cp, kategorie, unterbereich, semester, status,
-                    note100, notiz, sort_order, created_at, updated_at
+                    note100, notiz, sort_order, created_at, updated_at,
+                    termin_datum, termin_beginn, termin_ende, termin_raum
              FROM belegungen ORDER BY sort_order, id",
         )?;
         let rows = st.query_map([], Self::row_belegung)?;
@@ -188,6 +258,7 @@ impl Db {
     pub fn upsert_belegung(&self, b: &Belegung, now_ms: i64) -> Result<Belegung> {
         let mut out = b.clone();
         out.updated_at = now_ms;
+        let [td, tb, te, tr] = termin_cols(&out.eigener_termin);
         if b.id == 0 {
             out.created_at = now_ms;
             if out.sort_order == 0 {
@@ -199,8 +270,9 @@ impl Db {
             }
             self.conn.execute(
                 "INSERT INTO belegungen(modul_code, titel, cp, kategorie, unterbereich, semester,
-                     status, note100, notiz, sort_order, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+                     status, note100, notiz, sort_order, created_at, updated_at,
+                     termin_datum, termin_beginn, termin_ende, termin_raum)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
                 params![
                     out.modul_code,
                     out.titel,
@@ -213,7 +285,11 @@ impl Db {
                     out.notiz,
                     out.sort_order,
                     out.created_at,
-                    out.updated_at
+                    out.updated_at,
+                    td,
+                    tb,
+                    te,
+                    tr
                 ],
             )?;
             out.id = self.conn.last_insert_rowid();
@@ -221,7 +297,8 @@ impl Db {
             self.conn.execute(
                 "UPDATE belegungen SET modul_code = ?2, titel = ?3, cp = ?4, kategorie = ?5,
                      unterbereich = ?6, semester = ?7, status = ?8, note100 = ?9, notiz = ?10,
-                     sort_order = ?11, updated_at = ?12
+                     sort_order = ?11, updated_at = ?12, termin_datum = ?13, termin_beginn = ?14,
+                     termin_ende = ?15, termin_raum = ?16
                  WHERE id = ?1",
                 params![
                     out.id,
@@ -235,7 +312,11 @@ impl Db {
                     out.note100,
                     out.notiz,
                     out.sort_order,
-                    out.updated_at
+                    out.updated_at,
+                    td,
+                    tb,
+                    te,
+                    tr
                 ],
             )?;
         }
@@ -271,10 +352,12 @@ impl Db {
         tx.execute("DELETE FROM belegungen", [])?;
         tx.execute("DELETE FROM kv WHERE key NOT LIKE ?1", params![format!("{CACHE_PREFIX}%")])?;
         for b in &snap.belegungen {
+            let [td, tb, te, tr] = termin_cols(&b.eigener_termin);
             tx.execute(
                 "INSERT INTO belegungen(id, modul_code, titel, cp, kategorie, unterbereich, semester,
-                     status, note100, notiz, sort_order, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
+                     status, note100, notiz, sort_order, created_at, updated_at,
+                     termin_datum, termin_beginn, termin_ende, termin_raum)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
                 params![
                     if b.id > 0 { Some(b.id) } else { None },
                     b.modul_code,
@@ -288,7 +371,11 @@ impl Db {
                     b.notiz,
                     b.sort_order,
                     b.created_at,
-                    b.updated_at
+                    b.updated_at,
+                    td,
+                    tb,
+                    te,
+                    tr
                 ],
             )?;
         }
@@ -323,6 +410,7 @@ mod tests {
             status: if note.is_some() { "bestanden".into() } else { "geplant".into() },
             note100: note,
             notiz: String::new(),
+            eigener_termin: None,
             sort_order: 0,
             created_at: 0,
             updated_at: 0,
@@ -394,6 +482,88 @@ mod tests {
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].note100, Some(150));
         assert!(all[0].id > 0);
+    }
+
+    #[test]
+    fn own_exam_date_roundtrip() {
+        let mut db = Db::open_in_memory().unwrap();
+        let mut b = sample(None, None);
+        b.eigener_termin = Some(EigenerTermin {
+            datum: "2027-02-10".into(),
+            beginn: Some("09:00".into()),
+            ende: None,
+            raum: Some("Raum 1".into()),
+        });
+        let saved = db.upsert_belegung(&b, 1).unwrap();
+        assert_eq!(db.list_belegungen().unwrap()[0].eigener_termin, b.eigener_termin);
+
+        let mut cleared = saved.clone();
+        cleared.eigener_termin = None;
+        db.upsert_belegung(&cleared, 2).unwrap();
+        assert_eq!(db.list_belegungen().unwrap()[0].eigener_termin, None);
+
+        db.upsert_belegung(&saved, 3).unwrap();
+        let snap = db.snapshot().unwrap();
+        db.restore(&snap).unwrap();
+        assert_eq!(db.list_belegungen().unwrap()[0].eigener_termin, b.eigener_termin);
+    }
+
+    #[test]
+    fn migrates_old_database() {
+        // Shape of v0.2 (no exam date columns).
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("mwmaster.db");
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                 CREATE TABLE belegungen (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT, modul_code TEXT, titel TEXT NOT NULL,
+                    cp REAL NOT NULL, kategorie TEXT NOT NULL, unterbereich TEXT,
+                    semester TEXT NOT NULL, status TEXT NOT NULL, note100 INTEGER,
+                    notiz TEXT NOT NULL DEFAULT '', sort_order INTEGER NOT NULL DEFAULT 0,
+                    created_at INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL DEFAULT 0);
+                 INSERT INTO belegungen(titel, cp, kategorie, semester, status, note100)
+                    VALUES ('Alt', 5, 'K', 'SS 27', 'bestanden', 130);",
+            )
+            .unwrap();
+        }
+        let db = Db::open(&path).unwrap();
+        let all = db.list_belegungen().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].titel, "Alt");
+        assert_eq!(all[0].note100, Some(130));
+        assert_eq!(all[0].eigener_termin, None);
+        // Opening again does not try to add the columns twice.
+        drop(db);
+        Db::open(&path).unwrap();
+    }
+
+    #[test]
+    fn upgrades_version_1_backup() {
+        let json = r#"{
+            "version": 1,
+            "belegungen": [
+                { "id": 3, "modulCode": "XX0001", "titel": "Alt", "cp": 5, "kategorie": "K",
+                  "semester": "WS 26/27", "status": "geplant" }
+            ],
+            "kv": [["settings", "{\"erstesSemester\":\"WS 26/27\"}"], ["spiel", "[]"]]
+        }"#;
+        let snap: Snapshot = serde_json::from_str(json).unwrap();
+        let mut db = Db::open_in_memory().unwrap();
+        db.restore(&snap).unwrap();
+        assert_eq!(db.list_belegungen().unwrap()[0].eigener_termin, None);
+        let settings: serde_json::Value = serde_json::from_str(&db.get_kv("settings").unwrap().unwrap()).unwrap();
+        assert_eq!(settings["gelbGrenze"], 2);
+        assert_eq!(settings["erstesSemester"], "WS 26/27");
+        assert_eq!(db.get_kv("spiel").unwrap().as_deref(), Some("[]"));
+        assert_eq!(db.snapshot().unwrap().version, 2);
+
+        // A version 2 backup keeps its own value.
+        let v2 = r#"{ "version": 2, "kv": [["settings", "{\"gelbGrenze\":0}"]] }"#;
+        db.restore(&serde_json::from_str(v2).unwrap()).unwrap();
+        let settings: serde_json::Value = serde_json::from_str(&db.get_kv("settings").unwrap().unwrap()).unwrap();
+        assert_eq!(settings["gelbGrenze"], 0);
     }
 
     #[test]

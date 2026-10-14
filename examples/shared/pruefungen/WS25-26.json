@@ -1,0 +1,62 @@
+{
+  "semester": "WS 25/26",
+  "stand": "2026-03-20",
+  "quelle": "ERFUNDENE BEISPIELDATEN",
+  "termine": [
+    {
+      "id": "XX0002-2025W-1",
+      "code": "XX0002",
+      "pruefungsnummer": "XX0002-1",
+      "titel": "Example: Numerical Fluid Mechanics (written)",
+      "art": "Modulprüfung",
+      "datum": "2026-02-12",
+      "beginn": "10:30",
+      "ende": "12:00",
+      "raeume": ["Hörsaal B1"],
+      "pruefer": ["Muster, Erika"],
+      "abmeldungBis": "2026-02-05"
+    },
+    {
+      "id": "XX0001-2025W-1",
+      "code": "XX0001",
+      "pruefungsnummer": "XX0001",
+      "art": "Modulprüfung",
+      "datum": "2026-02-12",
+      "beginn": "14:00",
+      "ende": "15:30",
+      "raeume": ["Hörsaal A1", "Hörsaal A2"],
+      "pruefer": ["Beispiel, Hans"]
+    },
+    {
+      "id": "XX0004-2025W-1",
+      "code": "XX0004",
+      "pruefungsnummer": "XX0004",
+      "art": "Modulprüfung",
+      "datum": "2026-02-18",
+      "beginn": "08:00",
+      "ende": "09:30",
+      "raeume": ["Hörsaal C"]
+    },
+    {
+      "id": "XX0002-2025W-2",
+      "code": "XX0002",
+      "pruefungsnummer": "XX0002-2",
+      "titel": "Example: Numerical Fluid Mechanics (lab)",
+      "art": "Fachprüfung",
+      "datum": "2026-02-26",
+      "beginn": null,
+      "ende": null,
+      "raeume": []
+    },
+    {
+      "id": "XX0003-2025W-1",
+      "code": "XX0003",
+      "pruefungsnummer": "XX0003",
+      "art": "Modulprüfung",
+      "datum": "2026-03-02",
+      "beginn": "13:00",
+      "ende": "14:30",
+      "raeume": ["Hörsaal B1"]
+    }
+  ]
+}

@@ -8,4 +8,4 @@ pub mod backup;
 pub mod db;
 pub mod shared;
 
-pub use db::{Belegung, Db, DbError, Snapshot, SCHEMA_VERSION};
+pub use db::{Belegung, Db, DbError, EigenerTermin, Snapshot, SCHEMA_VERSION};

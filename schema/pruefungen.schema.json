@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mw-master-app/schema/pruefungen.schema.json",
+  "title": "pruefungen/<SEMESTER>.json",
+  "description": "Prüfungstermine eines Semesters aus TUMonline (ab Schema 1.3). Nur Termine von Katalogmodulen. Zuordnung zum Semester nach der TUMonline-Angabe ('2026 W' -> 'WS 26/27', '2026 S' -> 'SS 26'), nicht nach dem Datum.",
+  "type": "object",
+  "required": ["semester", "stand", "termine"],
+  "properties": {
+    "semester": {
+      "type": "string",
+      "pattern": "^(WS [0-9]{2}/[0-9]{2}|SS [0-9]{2})$",
+      "description": "Semester im Format des Plans, z. B. 'WS 26/27' oder 'SS 26'"
+    },
+    "stand": { "$ref": "#/$defs/isoDatum", "description": "Datum des TUMonline-Ausdrucks" },
+    "quelle": { "type": "string" },
+    "termine": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/termin" }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "isoDatum": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$"
+    },
+    "uhrzeit": {
+      "type": ["string", "null"],
+      "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+    },
+    "termin": {
+      "type": "object",
+      "required": ["id", "code", "datum"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^.+-[0-9]{4}[WS]-[0-9]+$",
+          "description": "<code>-<JJJJ><W|S>-<n>, eindeutig in der Datei, möglichst stabil über Aktualisierungen"
+        },
+        "code": { "type": "string", "minLength": 1, "description": "Modulcode im Katalog (Prüfungsnummer ohne Endung)" },
+        "pruefungsnummer": { "type": "string", "description": "Nummer wie in TUMonline, z. B. 'SZ0337-1'" },
+        "titel": { "type": "string" },
+        "art": { "type": "string", "description": "z. B. 'Modulprüfung' oder 'Fachprüfung'" },
+        "vorbehaltlich": { "type": "boolean", "default": false },
+        "datum": {
+          "oneOf": [ { "$ref": "#/$defs/isoDatum" }, { "type": "null" } ],
+          "description": "null, wenn TUMonline kein Datum nennt (z. B. Termin nach Absprache)"
+        },
+        "datumBis": { "$ref": "#/$defs/isoDatum", "description": "letzter Tag bei mehrtägigen Terminen" },
+        "beginn": { "$ref": "#/$defs/uhrzeit" },
+        "ende": { "$ref": "#/$defs/uhrzeit" },
+        "raeume": { "type": "array", "items": { "type": "string" } },
+        "pruefer": { "type": "array", "items": { "type": "string" } },
+        "anmeldungVon": { "$ref": "#/$defs/isoDatum" },
+        "anmeldungBis": { "$ref": "#/$defs/isoDatum" },
+        "abmeldungBis": { "$ref": "#/$defs/isoDatum" },
+        "alternativGruppe": {
+          "type": ["string", "null"],
+          "description": "Gleiche Zeichenkette = parallele Gruppen desselben Moduls; man schreibt nur eine davon"
+        },
+        "hinweis": { "type": ["string", "null"], "description": "Infozeile aus TUMonline" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

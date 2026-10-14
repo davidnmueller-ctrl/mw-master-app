@@ -111,7 +111,7 @@ test("manifest change detection", () => {
   const first = verarbeite(readExamples(), null, JETZT).daten!;
   const mf = readFileSync(join(EX, "manifest.json"), "utf-8");
   assert.equal(manifestGeaendert(mf, first), false);
-  assert.equal(manifestGeaendert(mf.replace("2026-10-07T18:00:00", "2026-10-08T09:00:00"), first), true);
+  assert.equal(manifestGeaendert(mf.replace(`"updatedAt": "2026-10-14T18:00:00`, `"updatedAt": "2026-10-15T09:00:00`), first), true);
   assert.equal(manifestGeaendert(mf, null), true);
 });
 

@@ -33,6 +33,7 @@ pub fn run() {
             commands::belegung_delete,
             commands::shared_manifest,
             commands::shared_read,
+            commands::shared_read_files,
             commands::backup_write,
             commands::backup_restore,
             commands::data_dir,

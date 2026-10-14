@@ -1,0 +1,91 @@
+{
+  "semester": "WS 26/27",
+  "stand": "2026-10-14",
+  "quelle": "ERFUNDENE BEISPIELDATEN",
+  "termine": [
+    {
+      "id": "XX0004-2026W-1",
+      "code": "XX0004",
+      "pruefungsnummer": "XX0004",
+      "art": "Modulprüfung",
+      "datum": "2027-02-10",
+      "beginn": "08:00",
+      "ende": "09:30",
+      "raeume": ["Hörsaal C"],
+      "alternativGruppe": "XX0004",
+      "anmeldungVon": "2026-11-16",
+      "anmeldungBis": "2027-01-15",
+      "abmeldungBis": "2027-02-03"
+    },
+    {
+      "id": "XX0001-2026W-1",
+      "code": "XX0001",
+      "pruefungsnummer": "XX0001",
+      "titel": "Example: Boundary Layers",
+      "art": "Modulprüfung",
+      "vorbehaltlich": true,
+      "datum": "2027-02-12",
+      "beginn": "14:00",
+      "ende": "15:30",
+      "raeume": ["Hörsaal A1", "Hörsaal A2"],
+      "pruefer": ["Beispiel, Hans"],
+      "anmeldungVon": "2026-11-16",
+      "anmeldungBis": "2027-01-15",
+      "abmeldungBis": "2027-02-05"
+    },
+    {
+      "id": "XX0005-2026W-1",
+      "code": "XX0005",
+      "pruefungsnummer": "XX0005",
+      "art": "Modulprüfung",
+      "datum": "2027-02-15",
+      "datumBis": "2027-02-17",
+      "beginn": null,
+      "ende": null,
+      "raeume": ["Windkanal Halle 3"],
+      "hinweis": "Blockprüfung über drei Tage, Einteilung folgt."
+    },
+    {
+      "id": "XX0004-2026W-2",
+      "code": "XX0004",
+      "pruefungsnummer": "XX0004",
+      "art": "Modulprüfung",
+      "datum": "2027-02-22",
+      "beginn": "08:00",
+      "ende": "09:30",
+      "raeume": ["Hörsaal C"],
+      "alternativGruppe": "XX0004"
+    },
+    {
+      "id": "XX0003-2026W-1",
+      "code": "XX0003",
+      "pruefungsnummer": "XX0003",
+      "art": "Modulprüfung",
+      "datum": "2027-03-01",
+      "beginn": "13:00",
+      "ende": "14:30",
+      "raeume": []
+    },
+    {
+      "id": "XX0007-2026W-1",
+      "code": "XX0007",
+      "pruefungsnummer": "XX0007",
+      "art": "Modulprüfung",
+      "datum": null,
+      "beginn": null,
+      "ende": null,
+      "raeume": [],
+      "pruefer": ["Muster, Erika"],
+      "hinweis": "Bitte den Termin direkt beim Lehrstuhl vereinbaren."
+    },
+    {
+      "id": "XX9999-2026W-1",
+      "code": "XX9999",
+      "pruefungsnummer": "XX9999",
+      "titel": "Example: module not in the catalog",
+      "datum": "2027-02-11",
+      "beginn": "10:00",
+      "ende": "11:00"
+    }
+  ]
+}

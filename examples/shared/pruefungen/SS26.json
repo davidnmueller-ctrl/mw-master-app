@@ -1,0 +1,49 @@
+{
+  "semester": "SS 26",
+  "stand": "2026-10-01",
+  "quelle": "ERFUNDENE BEISPIELDATEN",
+  "termine": [
+    {
+      "id": "XX0001-2026S-1",
+      "code": "XX0001",
+      "pruefungsnummer": "XX0001",
+      "art": "Modulprüfung",
+      "datum": "2026-04-14",
+      "beginn": "09:00",
+      "ende": "10:30",
+      "raeume": ["Hörsaal A1"]
+    },
+    {
+      "id": "XX0006-2026S-1",
+      "code": "XX0006",
+      "pruefungsnummer": "XX0006",
+      "art": "Modulprüfung",
+      "datum": "2026-07-28",
+      "beginn": "11:00",
+      "ende": "12:00",
+      "raeume": ["Seminarraum 2"]
+    },
+    {
+      "id": "XX0003-2026S-1",
+      "code": "XX0003",
+      "pruefungsnummer": "XX0003",
+      "art": "Modulprüfung",
+      "datum": "2026-08-13",
+      "beginn": "09:00",
+      "ende": "10:30",
+      "raeume": ["Hörsaal B1"],
+      "pruefer": ["Muster, Erika"]
+    },
+    {
+      "id": "XX0004-2026S-1",
+      "code": "XX0004",
+      "pruefungsnummer": "XX0004",
+      "art": "Modulprüfung",
+      "datum": "2026-10-09",
+      "beginn": "10:00",
+      "ende": "11:30",
+      "raeume": ["Hörsaal C"],
+      "hinweis": "Termin liegt im Oktober, gehört laut TUMonline aber zum SS 26."
+    }
+  ]
+}

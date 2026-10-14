@@ -8,9 +8,10 @@
 import Ajv2020 from "ajv/dist/2020";
 import manifestSchema from "../../schema/manifest.schema.json";
 import modulSchema from "../../schema/modul.schema.json";
+import pruefungenSchema from "../../schema/pruefungen.schema.json";
 import regelnSchema from "../../schema/regeln.schema.json";
 import tagsSchema from "../../schema/tags.schema.json";
-import type { Manifest, Modul, Regeln, SharedData, SharedRead, Tag } from "../types";
+import type { Manifest, Modul, PruefungsDatei, Regeln, SharedData, SharedRead, Tag } from "../types";
 
 /** Highest MAJOR schema version this app understands. */
 export const APP_SCHEMA_MAJOR = 1;
@@ -21,6 +22,7 @@ const validators = {
   regeln: ajv.compile<Regeln>(regelnSchema),
   tags: ajv.compile<Tag[]>(tagsSchema),
   modul: ajv.compile<Modul>(modulSchema),
+  pruefungen: ajv.compile<PruefungsDatei>(pruefungenSchema),
 };
 
 type Kind = keyof typeof validators;

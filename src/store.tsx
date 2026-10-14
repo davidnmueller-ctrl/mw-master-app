@@ -3,15 +3,28 @@
 // actions here so persistence and auto-backup stay in one place.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { backend } from "./api";
+import { berichtAusCache, verarbeitePruefungen, zuLesendePruefungen } from "./logic/pruefungsdaten";
 import { FALLBACK_REGELN, manifestGeaendert, verarbeite } from "./logic/shared";
-import type { Belegung, Modul, Regeln, Settings, SharedData, SpielZeile } from "./types";
-import { DEFAULT_SETTINGS } from "./types";
+import type {
+  Belegung,
+  Modul,
+  PruefungsAnsicht,
+  PruefungsBericht,
+  PruefungsCache,
+  Regeln,
+  Settings,
+  SharedData,
+  SpielZeile,
+} from "./types";
+import { DEFAULT_PRUEFUNGS_ANSICHT, DEFAULT_SETTINGS } from "./types";
 
 const KEY_SETTINGS = "settings";
 const KEY_SPIEL = "spiel";
 const KEY_NOTIZEN = "notizen";
+const KEY_ANSICHT = "pruefungsansicht";
 /** "cache:" keys are left out of backups (see crates/mwmaster-core/src/db.rs). */
 const KEY_CACHE = "cache:shared";
+const KEY_PRUEF_CACHE = "cache:pruefungen";
 
 /** Re-check the shared folder at most once per hour while the app runs. */
 const AUTO_INTERVALL_MS = 60 * 60 * 1000;
@@ -32,6 +45,12 @@ interface Store {
   /** Rules from the shared folder, or built-in fallback before one is linked. */
   regeln: Regeln;
   modulMap: Map<string, Modul>;
+  /** Exam dates per semester (cache of pruefungen/*.json); empty without exam data. */
+  pruefungen: PruefungsCache;
+  /** Per-semester state of the exam data (Einstellungen). */
+  pruefungsBericht: PruefungsBericht[];
+  /** Saved filters of the "Prüfungen" view. */
+  pruefungsAnsicht: PruefungsAnsicht;
   einlesen: EinleseStatus;
   spiel: SpielZeile[];
   notizen: Record<string, string>;
@@ -44,6 +63,7 @@ interface Store {
   leseShared(opts?: { nurWennGeaendert?: boolean; pfad?: string }): Promise<void>;
   setSpiel(zeilen: SpielZeile[]): Promise<void>;
   setNotiz(code: string, text: string): Promise<void>;
+  setPruefungsAnsicht(patch: Partial<PruefungsAnsicht>): Promise<void>;
   backupJetzt(): Promise<void>;
   wiederherstellen(pfad: string): Promise<number>;
 }
@@ -70,6 +90,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [settings, setSettingsState] = useState<Settings>(DEFAULT_SETTINGS);
   const [belegungen, setBelegungen] = useState<Belegung[]>([]);
   const [shared, setShared] = useState<SharedData | null>(null);
+  const [pruefungen, setPruefungen] = useState<PruefungsCache>({});
+  const [pruefungsBericht, setPruefungsBericht] = useState<PruefungsBericht[]>([]);
+  const [pruefungsAnsicht, setPruefungsAnsichtState] = useState<PruefungsAnsicht>(DEFAULT_PRUEFUNGS_ANSICHT);
   const [einlesen, setEinlesen] = useState<EinleseStatus>({ laeuft: false, fehler: null, warnungen: [], zuletztVersucht: null });
   const [spiel, setSpielState] = useState<SpielZeile[]>([]);
   const [notizen, setNotizen] = useState<Record<string, string>>({});
@@ -78,6 +101,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Refs so callbacks always see the latest values without re-subscribing.
   const sharedRef = useRef<SharedData | null>(null);
   sharedRef.current = shared;
+  const pruefRef = useRef<PruefungsCache>({});
+  pruefRef.current = pruefungen;
+  const ansichtRef = useRef(pruefungsAnsicht);
+  ansichtRef.current = pruefungsAnsicht;
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
   const notizenRef = useRef(notizen);
@@ -107,11 +134,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       }
       const read = await be.sharedRead(pfad);
       const r = verarbeite(read, sharedRef.current, jetzt);
+      const warnungen = [...r.warnungen];
       if (r.daten && r.fehler == null) {
         setShared(r.daten);
         await be.kvSet(KEY_CACHE, JSON.stringify(r.daten));
+
+        // Exam dates (schema 1.3): only files whose updatedAt changed are read.
+        const zuLesen = zuLesendePruefungen(r.daten.manifest, pruefRef.current);
+        const pr = zuLesen.length ? await be.sharedReadFiles(pfad, zuLesen.map((e) => e.datei)) : { files: [], errors: [] };
+        const p = verarbeitePruefungen(r.daten.manifest, pr, pruefRef.current, r.daten.module, jetzt);
+        warnungen.push(...p.warnungen);
+        setPruefungsBericht(p.bericht);
+        if (p.geaendert) {
+          pruefRef.current = p.cache;
+          setPruefungen(p.cache);
+          await be.kvSet(KEY_PRUEF_CACHE, JSON.stringify(p.cache));
+        }
       }
-      setEinlesen({ laeuft: false, fehler: r.fehler, warnungen: r.warnungen, zuletztVersucht: jetzt });
+      setEinlesen({ laeuft: false, fehler: r.fehler, warnungen, zuletztVersucht: jetzt });
     } catch (e) {
       setEinlesen((s) => ({ ...s, laeuft: false, fehler: String(e instanceof Error ? e.message : e), zuletztVersucht: jetzt }));
     }
@@ -123,12 +163,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       const be = await backend();
-      const [s, bs, cache, sp, nz] = await Promise.all([
+      const [s, bs, cache, sp, nz, pc, an] = await Promise.all([
         be.kvGet(KEY_SETTINGS),
         be.belegungenList(),
         be.kvGet(KEY_CACHE),
         be.kvGet(KEY_SPIEL),
         be.kvGet(KEY_NOTIZEN),
+        be.kvGet(KEY_PRUEF_CACHE),
+        be.kvGet(KEY_ANSICHT),
       ]);
       if (cancelled) return;
       const st = { ...DEFAULT_SETTINGS, ...parseJson<Partial<Settings>>(s, {}) };
@@ -138,6 +180,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       const c = parseJson<SharedData | null>(cache, null);
       sharedRef.current = c;
       setShared(c);
+      const p = parseJson<PruefungsCache>(pc, {});
+      pruefRef.current = p;
+      setPruefungen(p);
+      setPruefungsBericht(berichtAusCache(p, c?.module ?? []));
+      setPruefungsAnsichtState({ ...DEFAULT_PRUEFUNGS_ANSICHT, ...parseJson<Partial<PruefungsAnsicht>>(an, {}) });
       setSpielState(parseJson<SpielZeile[]>(sp, []));
       setNotizen(parseJson<Record<string, string>>(nz, {}));
       setBereit(true);
@@ -194,6 +241,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     markDirty();
   }, []);
 
+  const setPruefungsAnsicht = useCallback<Store["setPruefungsAnsicht"]>(async (patch) => {
+    const next = { ...ansichtRef.current, ...patch };
+    ansichtRef.current = next;
+    setPruefungsAnsichtState(next);
+    await (await backend()).kvSet(KEY_ANSICHT, JSON.stringify(next));
+    markDirty();
+  }, []);
+
   // ---------------- backup ----------------
 
   const backupJetzt = useCallback<Store["backupJetzt"]>(async () => {
@@ -217,7 +272,13 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const wiederherstellen = useCallback<Store["wiederherstellen"]>(async (pfad) => {
     const be = await backend();
     const n = await be.backupRestore(pfad);
-    const [s, bs, sp, nz] = await Promise.all([be.kvGet(KEY_SETTINGS), be.belegungenList(), be.kvGet(KEY_SPIEL), be.kvGet(KEY_NOTIZEN)]);
+    const [s, bs, sp, nz, an] = await Promise.all([
+      be.kvGet(KEY_SETTINGS),
+      be.belegungenList(),
+      be.kvGet(KEY_SPIEL),
+      be.kvGet(KEY_NOTIZEN),
+      be.kvGet(KEY_ANSICHT),
+    ]);
     // A backup from another computer may carry different folder paths; keep this computer's.
     const st = {
       ...DEFAULT_SETTINGS,
@@ -232,6 +293,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setBelegungen(bs);
     setSpielState(parseJson<SpielZeile[]>(sp, []));
     setNotizen(parseJson<Record<string, string>>(nz, {}));
+    setPruefungsAnsichtState({ ...DEFAULT_PRUEFUNGS_ANSICHT, ...parseJson<Partial<PruefungsAnsicht>>(an, {}) });
     return n;
   }, []);
 
@@ -245,6 +307,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     shared,
     regeln,
     modulMap,
+    pruefungen,
+    pruefungsBericht,
+    pruefungsAnsicht,
     einlesen,
     spiel,
     notizen,
@@ -255,6 +320,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     leseShared,
     setSpiel,
     setNotiz,
+    setPruefungsAnsicht,
     backupJetzt,
     wiederherstellen,
   };

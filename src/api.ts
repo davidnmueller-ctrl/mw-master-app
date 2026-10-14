@@ -13,8 +13,10 @@ export interface Backend {
   belegungDelete(id: number): Promise<void>;
   /** Content of manifest.json in the shared folder (cheap change check). */
   sharedManifest(path: string): Promise<string>;
-  /** All files of the shared folder, raw. Never writes. */
+  /** manifest, regeln, tags and module/*.json of the shared folder, raw. Never writes. */
   sharedRead(path: string): Promise<SharedRead>;
+  /** Single exam date files ("pruefungen/SS26.json"), raw. Never writes. */
+  sharedReadFiles(path: string, names: string[]): Promise<SharedRead>;
   /** Write the private backup into `dir`; returns the file path. */
   backupWrite(dir: string): Promise<string>;
   /** Replace private data with a backup/import file; returns the number of Belegungen. */
@@ -32,6 +34,7 @@ async function tauriBackend(): Promise<Backend> {
     belegungDelete: (id) => invoke("belegung_delete", { id }),
     sharedManifest: (path) => invoke("shared_manifest", { path }),
     sharedRead: (path) => invoke("shared_read", { path }),
+    sharedReadFiles: (path, names) => invoke("shared_read_files", { path, names }),
     backupWrite: (dir) => invoke("backup_write", { dir }),
     backupRestore: (path) => invoke("backup_restore", { path }),
     dataDir: () => invoke("data_dir"),
@@ -46,10 +49,12 @@ export const BEISPIEL_PFAD = "beispieldaten";
 // Lazy: the sample data is only loaded in browser mode, never bundled into the app's main chunk.
 const beispiel = import.meta.glob("../examples/shared/**/*.json", { query: "?raw", import: "default" });
 
-async function beispielRead(): Promise<SharedRead> {
+async function beispielRead(nur?: string[]): Promise<SharedRead> {
   const files: SharedRead["files"] = [];
   for (const [p, load] of Object.entries(beispiel)) {
     const name = p.replace("../examples/shared/", "");
+    // Like the Rust side: exam files only on request, everything else in one go.
+    if (nur ? !nur.includes(name) : name.startsWith("pruefungen/")) continue;
     files.push({ name, content: (await load()) as string });
   }
   const order = (n: string) => (n === "manifest.json" ? 0 : n === "regeln.json" ? 1 : n === "tags.json" ? 2 : 3);
@@ -106,8 +111,14 @@ function browserBackend(): Backend {
       if (path !== BEISPIEL_PFAD) throw notFound(path);
       return beispielRead();
     },
+    sharedReadFiles: async (path, names) => {
+      if (path !== BEISPIEL_PFAD) throw notFound(path);
+      const r = await beispielRead(names);
+      const errors = names.filter((n) => !r.files.some((f) => f.name === n)).map((name) => ({ name, error: "fehlt" }));
+      return { ...r, errors };
+    },
     backupWrite: async () => {
-      ls.set("backup", JSON.stringify({ version: 1, belegungen: load() }));
+      ls.set("backup", JSON.stringify({ version: 2, belegungen: load() }));
       return "localStorage (Browser-Modus)";
     },
     backupRestore: async () => {

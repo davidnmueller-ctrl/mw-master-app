@@ -28,6 +28,7 @@ export function leereBelegung(patch: Partial<Belegung> = {}): Belegung {
     status: "geplant",
     note100: null,
     notiz: "",
+    eigenerTermin: null,
     sortOrder: 0,
     createdAt: 0,
     updatedAt: 0,

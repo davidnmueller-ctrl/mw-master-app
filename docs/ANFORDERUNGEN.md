@@ -1,13 +1,13 @@
 # MW Master App – Anforderungen
 
-Stand: 07.10.2026 · Version 3 der Spezifikation
+Stand: 14.10.2026 · Version 3.3 der Spezifikation (Datenformat 1.3: Prüfungstermine)
 
 Grundlage der Regeln: Studienplan **Maschinenwesen [20261]** in TUMonline (Master of Science 1630 16 400), FPSO Maschinenwesen (Master) vom 02.11.2023 in der lesbaren Fassung mit der Änderungssatzung vom 07.03.2024 und die APSO der TUM.
 
 Dieses Dokument ist die gemeinsame Grundlage für zwei Seiten:
 
 - **Claude Code** baut und pflegt die App im Repo `C:\dev\mw-master-app`.
-- **Claude im Projekt „Master_App“** pflegt die geteilten Daten (Modulkatalog, Notenspiegel, Kommentare) im OneDrive.
+- **Claude im Projekt „Master_App“** pflegt die geteilten Daten (Modulkatalog, Notenspiegel, Kommentare, Prüfungstermine) im OneDrive.
 
 Die Schnittstelle zwischen beiden ist das **Datenformat in Abschnitt 5**. Ändert sich daran etwas, wird es zuerst hier festgelegt.
 
@@ -15,11 +15,12 @@ Die Schnittstelle zwischen beiden ist das **Datenformat in Abschnitt 5**. Änder
 
 ## 1. Ziel
 
-Eine Desktop-App für Studierende im **M.Sc. Maschinenwesen an der TUM** (eine FPSO für alle Nutzer) mit drei Funktionen:
+Eine Desktop-App für Studierende im **M.Sc. Maschinenwesen an der TUM** (eine FPSO für alle Nutzer) mit vier Funktionen:
 
 1. **Noten:** Eigene Noten eintragen. Die App rechnet Schnitt, Zeugnisnote und Prädikat aus und prüft die CP-Struktur.
 2. **Spielmodus:** Für die noch offenen CP vermutete Noten eintragen und den sich daraus ergebenden Gesamtschnitt sehen.
 3. **Modulplanung:** Module aus einem gemeinsamen Katalog mit Kurzbeschreibung, Kategorie, Turnus, TUMonline-Links, Notenspiegel und Kommentaren ansehen und auf eigene Semester verteilen.
+4. **Prüfungstermine:** Klausurtermine aus TUMonline im Kalender sehen, nach eigenem Plan oder nach Themen filtern und gewarnt werden, wenn sich Prüfungen im eigenen Semesterplan ungünstig kreuzen.
 
 Nutzer sind Max und Freunde aus demselben Studiengang. Jeder hat **private Daten** (Noten, Plan, Spielstand) lokal auf dem eigenen Rechner und liest **geteilte Daten** (Katalog, Notenspiegel) aus einem OneDrive-Ordner, für den er nur Lesezugriff hat.
 
@@ -100,6 +101,7 @@ Eine Belegung hat:
 - Status: `Idee` · `geplant` · `angemeldet` · `bestanden` · `anerkannt` · `nicht bestanden`
 - Note (nur bei `bestanden` oder `anerkannt`): eine TUM-Notenstufe, `bestanden` ohne Note, oder bei `anerkannt` ein freier Wert zwischen 1,0 und 4,0 mit einer Nachkommastelle. Umgerechnete Auslandsnoten behalten nach § 16 Abs. 6 APSO genau eine Nachkommastelle, z. B. 1,5.
 - private Notiz (Freitext)
+- **eigener Prüfungstermin** (optional, privat): Datum, Beginn, Ende, Raum. Gedacht vor allem für freie Einträge, die keinen Termin in den geteilten Daten haben, geht aber bei jeder Belegung (z. B. bei einem Katalogmodul mit „Termin nach Absprache“). Ist er gesetzt, gilt er für diese Belegung statt der geteilten Termine und der Schätzung (siehe 4.8).
 
 ### 4.2 Noten und Schnitt
 
@@ -133,6 +135,12 @@ Gerechnet wird nur über benotete Belegungen in Kategorien mit `zaehltZurNote: t
 - Module per Drag & Drop oder Auswahlfeld verschieben. Damit Drag & Drop im Tauri-Fenster funktioniert (WebView2 fängt Ziehen sonst für Datei-Drops ab), ist im Fenster `dragDropEnabled: false` gesetzt; Dateien per Drag & Drop nimmt die App nicht an.
 - Karten von Katalogmodulen haben einen kleinen Knopf ⓘ. Er öffnet rechts dieselbe Detailansicht wie im Katalog (Beschreibung, alle Termine, Diagramm), ohne den Bearbeiten-Dialog; ein zweiter Klick oder ✕ schließt sie. Ein Klick auf die übrige Karte öffnet weiterhin den Bearbeiten-Dialog.
 - Gesamtüberblick: CP pro Kategorie über alle Semester gegen die Regeln, wie die Leiste in der bisherigen Modulwahl-HTML.
+- **Prüfungstermin auf der Modulkarte:** Datum und Uhrzeit der Prüfung im Semester der Spalte (Herkunft nach 4.8). Eine Schätzung steht mit „≈“ und gestrichelt da, ohne jeden Termin steht „kein Termin bekannt“.
+- **Prüfungskonflikte (Regeln in 4.8):**
+  - Im Kopf jedes Semesters steht ein Hinweis wie „2 Prüfungskonflikte · 1 möglich (Schätzung)“, gefärbt nach dem schlimmsten Konflikt. Ohne Konflikte steht dort nichts.
+  - Modulkarten mit Konflikt tragen ein Symbol in der Konfliktfarbe. Der Tooltip nennt das andere Modul, beide Termine und die Stufe.
+  - Der Gesamtüberblick bekommt eine Liste aller Prüfungskonflikte nach Semester. Ein Klick springt zum Semester bzw. in die Ansicht „Prüfungen“.
+  - Verschiebt man ein Modul in ein anderes Semester, werden die Konflikte sofort neu berechnet.
 
 ### 4.4 Spielmodus
 
@@ -153,7 +161,7 @@ Bewusst einfach: **Die App rechnet nichts zurück.** Man trägt vermutete Noten 
 
 - Tabelle aller Module aus dem geteilten Ordner. Filter: Kategorie (Mehrfachauswahl als Chips, mit „Alle wählen“ und „Alle abwählen“; ein Modul passt, wenn eine seiner Kategorien gewählt ist), Themen-Tag, Turnus (WS/SS), Angebot im gewählten Semester, Sprache, Freitextsuche (Titel, Nummer, Dozent).
 - Über der Tabelle steht immer, wie viele Module die aktuelle Suche und die Filter ergeben und wie viele davon eine Prüfungsstatistik (mindestens einen Notenspiegel) haben, z. B. „12 von 734 Modulen · 5 mit Prüfungsstatistik (42 %)“; ohne Filter „734 Module · 210 mit Prüfungsstatistik (29 %)“.
-- Spalten: Titel, Nummer, CP, Kategorie(n), Turnus, Sprache, Ø bestanden, Durchfallquote, „im Plan“. Alle Spalten sind sortierbar.
+- Spalten: Titel, Nummer, CP, Kategorie(n), Turnus, Sprache, Ø bestanden, Durchfallquote, „im Plan“, **Prüfung** (Datum im Semester des Filters „Angebot im gewählten Semester“; ohne gewähltes Semester das erste Plansemester, das heute noch nicht vorbei ist, wobei ein WS bis 31.03. und ein SS bis 30.09. läuft; Schätzungen mit „≈“). Alle Spalten sind sortierbar.
 - Detailansicht eines Moduls:
   - Kurzbeschreibung, Prüfungsform, Leitung, Sprache, CP, erlaubte Kategorien, Tags
   - Links: Modulbeschreibung in TUMonline und die Lehrveranstaltung pro Semester. Sie öffnen sich im Standardbrowser.
@@ -169,7 +177,8 @@ Bewusst einfach: **Die App rechnet nichts zurück.** Man trägt vermutete Noten 
       Die Detailansicht ändert sich dadurch nicht.
     - Gibt es keine Daten, steht dort „Noch kein Notenspiegel“.
   - **Kommentare** aus den geteilten Daten, z. B. Erfahrungsberichte von Freunden. In der App nur lesbar.
-  - Eigene private Notiz und der Knopf „Zum Plan hinzufügen“ mit Semesterauswahl.
+  - **Prüfungstermine:** alle bekannten echten Termine des Moduls, nach Semester gruppiert, neueste zuerst, mit Datum, Uhrzeit, Raum, Haupt- oder Wiederholungstermin, Prüfungsnummer, Art und gegebenenfalls „vorbehaltlich“ und Hinweistext. Liegt das Modul im Plan und gibt es für dessen Semester keinen echten Termin, steht dort zusätzlich die Schätzung (4.8).
+  - Eigene private Notiz und der Knopf „Zum Plan hinzufügen“ mit Semesterauswahl. Nach der Wahl des Semesters zeigt eine Vorschau den Prüfungstermin dort und die Konflikte, die entstehen würden (z. B. „Konflikt mit Beispielmodul: gleicher Tag“), oder „keine Prüfungskonflikte“. Hinzufügen bleibt immer möglich.
 - Der Katalog ist in der App nicht bearbeitbar. Ein Modul, das fehlt, wird als freier Eintrag angelegt (4.1).
 
 ### 4.6 Einstellungen und Daten
@@ -179,6 +188,8 @@ Bewusst einfach: **Die App rechnet nichts zurück.** Man trägt vermutete Noten 
 - **Schema-Version:** Ist die Hauptversion der Daten neuer als die der App, zeigt die App den Hinweis „Bitte App aktualisieren“ und behält den alten Cache.
 - **Backup:** automatisch als JSON in einen frei wählbaren Ordner (z. B. ein privater OneDrive-Ordner), dazu manuell exportieren und wiederherstellen. Die App warnt, wenn der Backup-Ordner innerhalb des geteilten Ordners liegt.
 - **Import:** Das Backup-Format lässt sich auch importieren. Darüber kann Claude einmalig die bisherigen Noten aus `Masternote_Rechner.xlsx` als Importdatei vorbereiten.
+- **Prüfungskonflikte:** Grenze für „gelb“ in Kalendertagen (Standard 2, erlaubt 0 bis 7; 0 schaltet gelb ab).
+- Die Prüfungsdateien (5.6) werden wie die Moduldateien eingelesen: Jede Datei wird einzeln validiert, eine ungültige Datei wird übersprungen und gemeldet, für dieses Semester bleibt der alte Stand im Cache. In den Einstellungen steht pro Semester der Stand der Prüfungsdaten. Technisch liegt der Cache unter dem kv-Schlüssel `cache:pruefungen` und ist damit (wie `cache:shared`) nicht im Backup.
 - Version und „Nach Updates suchen“.
 
 ### 4.7 Ersteinrichtung
@@ -188,6 +199,83 @@ Beim ersten Start:
 1. Erstes Mastersemester wählen.
 2. Geteilten Ordner wählen. Das lässt sich überspringen; die App funktioniert dann nur mit privaten Daten.
 3. Backup-Ordner wählen (optional).
+
+### 4.8 Prüfungstermine und Kalender
+
+Die Klausurtermine aus TUMonline erscheinen in einem Kalender. Man kann sie nach dem eigenen Plan oder nach Themen filtern und sieht früh, wenn sich Prüfungen im Semesterplan ungünstig kreuzen. Das Datenformat steht in 5.6.
+
+**Welcher Termin gehört zu einer Belegung?**
+
+- Maßgeblich ist das Semester der Belegung im Plan (4.3) und die **Semesterangabe aus TUMonline, nicht das Datum**. Ein Termin am 09.10.2026 mit der Angabe „2026 S“ gehört zum SS 26. Liegt ein SS-Modul im WS-Plan, gilt der Termin, den TUMonline für dieses WS führt.
+- Herkunft in dieser Reihenfolge:
+  1. eigener Prüfungstermin der Belegung (4.1)
+  2. echte Termine des Moduls in der Prüfungsdatei dieses Semesters
+  3. Schätzung (siehe unten)
+  4. „kein Termin bekannt“
+- Hat ein Modul in einem Semester mehrere Einträge, gilt: Einträge mit derselben `alternativGruppe` sind **Alternativen** (parallele Gruppen, man schreibt eine davon). Einträge ohne `alternativGruppe` oder mit verschiedenen Gruppen sind **Teile**, die alle geschrieben werden.
+- Einträge ohne Datum (z. B. „Termin nach Absprache“) erscheinen nur in der Liste, mit Hinweistext, und lösen keine Konflikte aus.
+- Einträge mit `vorbehaltlich: true` tragen das Etikett „vorbehaltlich“ und werden sonst normal behandelt.
+- **Haupt- oder Wiederholungstermin** eines Eintrags ergibt sich aus dem `turnus` des Moduls und der Semesterart nach der Tabelle in 5.5. `unbekannt` wird wie ein Haupttermin behandelt.
+
+**Schätzung aus dem Vorjahr.** Gibt es für ein Modul in einem Semester keinen echten Termin (die Prüfungsdatei fehlt oder enthält das Modul nicht), rechnet die App eine Schätzung:
+
+- Sie nimmt das neueste frühere Semester derselben Art (WS → WS, SS → SS), in dem das Modul Einträge hat, und übernimmt diese Einträge.
+- Jedes Datum wird um die Jahresdifferenz auf denselben Kalendertag verschoben (29.02. → 28.02.). Uhrzeit, Raum und `alternativGruppe` bleiben gleich.
+- Fällt die Schätzung auf ein Wochenende, wird nichts korrigiert. Der Nutzer sieht das Vorjahresdatum und schätzt selbst.
+- Darstellung: gestrichelt, mit „≈“ und dem Hinweis „Schätzung – Vorjahr: Do 12.02.2026“.
+- Schätzungen stehen nicht in den geteilten Daten. Die App berechnet sie selbst.
+
+**Konfliktregeln**
+
+Geprüft werden alle Belegungen mit Status `Idee`, `geplant` oder `angemeldet` im selben Semester des Plans. Die Spalten „vor dem Master“ und „ohne Termin“ werden nicht geprüft. Alle drei Status zählen gleich.
+
+Für zwei Termine a und b mit Datum gilt (G = Gelb-Grenze aus den Einstellungen, Standard 2):
+
+| Stufe | Bedingung |
+|---|---|
+| rot | gleicher Tag, und die Zeiten überschneiden sich: a.beginn < b.ende und b.beginn < a.ende |
+| orange | gleicher Tag, die Zeiten überschneiden sich nicht oder mindestens eine ist unbekannt |
+| gelb | 1 ≤ Abstand in Kalendertagen ≤ G. Bei G = 2 sind Mo+Di und Mo+Mi gelb, Mo+Do nicht. |
+| keine | sonst |
+
+- **Mehrtägige Termine** (`datumBis`): Überlappen sich die Tagesbereiche, ist es orange. Der Abstand für gelb wird zwischen den nächstgelegenen Tagen gemessen.
+- **Zwischen zwei Modulen A und B:** Für jedes Paar aus einem Teil von A und einem Teil von B zählt die günstigste Alternative. Kann man also über eine andere Gruppe ausweichen, ist es kein Konflikt. Die Stufe zwischen A und B ist die schlimmste über alle Teil-Paare. Alternativen werden nur paarweise betrachtet, nicht über drei oder mehr Module zugleich.
+- Teile desselben Moduls werden nicht gegeneinander geprüft.
+- Ist mindestens einer der beiden Termine eine Schätzung, ist der Konflikt **möglich**: Er hat dieselbe Farbe, ist aber gestrichelt und wird getrennt gezählt, z. B. „1 Konflikt · 2 möglich (Schätzung)“. Eigene Termine (4.1) zählen wie echte Termine.
+- Die App blockiert nie etwas, sie zeigt nur Hinweise.
+
+**Ansicht „Prüfungen“** (neuer Eintrag in der Navigation)
+
+- **Kopfzeile:**
+  - Semester-Auswahl: alle Semester des Plans und alle Semester mit Prüfungsdaten
+  - Umschalter **Monat / Woche / Liste**
+  - Stand der Prüfungsdatei, z. B. „Termine Stand 14.10.2026“ oder „Noch keine Termine – nur Schätzungen“
+- **Filter:**
+  - **Grundlage:** „Mein Plan“ (Belegungen des Semesters) oder „Alle Katalogmodule“ (alle Module mit echtem Termin oder Schätzung in diesem Semester)
+  - **Mein Plan immer einblenden** (nur bei „Alle“, Standard an). Die übrigen Filter wirken dann nur auf Module außerhalb des Plans.
+  - **Themen:** Mehrfachauswahl aus `tags.json`. Ein Modul erscheint, wenn es mindestens einen der gewählten Tags hat (ODER). Keine Auswahl heißt: alle Module.
+  - **Kategorie** (Mehrfachauswahl, nach den erlaubten Kategorien des Moduls) und **Turnus**
+  - **Wiederholungstermine einblenden** (nur bei „Alle“, Standard aus). Bei „Mein Plan“ sind sie immer sichtbar.
+  - **Schätzungen einblenden** (Standard an)
+  - **Nur konfliktfreie** (nur bei „Alle“): blendet Module außerhalb des Plans aus, die mit einer Belegung des Semesters einen Konflikt hätten. Das gilt für jede Stufe und auch für mögliche Konflikte.
+  - Filter, Ansicht und Semester werden privat gespeichert (kv-Schlüssel `pruefungsansicht`, im Backup enthalten).
+- **Darstellung eines Termins:**
+  - Uhrzeit, Kurztitel, Raum, Kategorie-Farbe und Ø bestanden (neuester Haupttermin, wie in 4.5)
+  - Module im Plan sind ausgefüllt, andere nur umrandet.
+  - Schätzungen sind gestrichelt und tragen „≈“. „vorbehaltlich“ steht als kleines Etikett dabei.
+  - Konflikte zeigen Rahmen und Symbol in rot, orange oder gelb. Bei Modulen außerhalb des Plans zeigt die Farbe den Konflikt, den das Modul **mit dem Plan** hätte.
+- **Monat:** Raster von Montag bis Sonntag. Startet im ersten Monat des Semesters, in dem gefilterte Termine liegen, mit Vor- und Zurückblättern. Liegen an einem Tag zu viele Termine, steht dort „+3 weitere“. Ein Klick darauf öffnet den Tag in der Liste.
+- **Woche:** Zeitraster von Montag bis Samstag (Sonntag nur, wenn dort Termine liegen), 8 bis 20 Uhr. Termine, die sich überschneiden, stehen nebeneinander. Termine ohne Uhrzeit stehen in einer Ganztagszeile.
+- **Liste:** nach Datum gruppiert, mit den Spalten Datum, Zeit, Modul, Kategorie, Raum, Ø bestanden, Durchfallquote, Haupt/Wiederholung, im Plan und Konflikt. Alle Spalten sind sortierbar. Termine ohne Datum stehen am Ende unter „Ohne Datum / nach Absprache“, mit Hinweistext.
+- **Konfliktliste:** Neben oder unter dem Kalender stehen die Konflikte des Semesters im Plan: Modulpaar, beide Termine, Stufe.
+- Ein Klick auf einen Termin öffnet die Detailansicht des Moduls (4.5). Bei freien Einträgen öffnet sich die Belegung.
+- **Export:** Knopf „Als Kalenderdatei (.ics) exportieren“ für die Belegungen des gewählten Semesters.
+  - Welche Status exportiert werden, ist wählbar. Vorausgewählt sind `geplant` und `angemeldet`.
+  - Schätzungen sind abwählbar und stehen sonst mit „(Schätzung)“ im Titel.
+  - Pro Termin ein Ereignis: Titel „Prüfung: <Modul>“, Ort = Räume, Beschreibung mit Prüfungsnummer, Prüfer*in, Abmeldefrist und Haupt- oder Wiederholungstermin.
+  - Zeiten mit `TZID=Europe/Berlin` und VTIMEZONE in der Datei. Termine ohne Uhrzeit werden Ganztagsereignisse.
+  - `UID` stabil (`<termin-id>@mwmaster`, bei eigenen Terminen `<belegung-id>-eigen@mwmaster`). So aktualisiert ein erneuter Import in Google Kalender oder Outlook die Termine, statt sie doppelt anzulegen.
+  - Gespeichert wird über den Dateidialog.
 
 ---
 
@@ -201,12 +289,20 @@ Beim ersten Start:
 │   ├── manifest.json
 │   ├── regeln.json
 │   ├── tags.json
-│   └── module/
-│       ├── XX0001.json
-│       ├── ED140016.json
+│   ├── module/
+│   │   ├── XX0001.json
+│   │   ├── XX0002.json
+│   │   └── …
+│   └── pruefungen/              ← ab Schema 1.3, eine Datei pro Semester
+│       ├── WS25-26.json
+│       ├── SS26.json
+│       ├── WS26-27.json
 │       └── …
 ├── _eingang/                    ← neue Screenshots/JPGs/PDFs, noch nicht verarbeitet
+├── _exam_dates/                 ← neue TUMonline-Prüfungslisten als PDF, noch nicht verarbeitet
 ├── _quellen/<MODULCODE>/        ← verarbeitete Originale (privat, nicht geteilt)
+├── _quellen/_pruefungen/<Datum>/ ← verarbeitete Prüfungslisten
+├── _schema/                     ← aktuelle JSON-Schemas zur Übergabe an Claude Code
 ├── _privat/                     ← App-Backups und Importdateien (privat)
 └── ANFORDERUNGEN.md
 ```
@@ -225,13 +321,18 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
 
 ```json
 {
-  "schemaVersion": "1.2",
-  "updatedAt": "2026-10-07T18:00:00+02:00",
+  "schemaVersion": "1.3",
+  "updatedAt": "2026-10-14T18:00:00+02:00",
   "studiengang": "M.Sc. Maschinenwesen (TUM)",
   "studienplan": "20261",
   "fpso": "FPSO Maschinenwesen (Master) vom 02.11.2023, lesbare Fassung 07.03.2024",
   "anzahlModule": 64,
-  "hinweis": "Gepflegt von Max Bergt. Ohne Gewähr, maßgeblich ist TUMonline."
+  "hinweis": "Gepflegt von Max Bergt. Ohne Gewähr, maßgeblich ist TUMonline.",
+  "pruefungen": [
+    { "semester": "WS 25/26", "datei": "pruefungen/WS25-26.json", "updatedAt": "2026-10-14T18:00:00+02:00" },
+    { "semester": "SS 26",    "datei": "pruefungen/SS26.json",    "updatedAt": "2026-10-14T18:00:00+02:00" },
+    { "semester": "WS 26/27", "datei": "pruefungen/WS26-27.json", "updatedAt": "2026-10-14T18:00:00+02:00" }
+  ]
 }
 ```
 
@@ -242,6 +343,9 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
 | 1.0 | erste Fassung |
 | 1.1 | Notenspiegel: Stufen `1.4`, `2.4`, `3.4` in `verteilung`, neue optionale Felder `notenbonus` und `hinweis` (5.5). App-Versionen bis einschließlich v0.1.0 kennen die Bonus-Stufen nicht und behalten für solche Moduldateien ihren Cache. |
 | 1.2 | Notenspiegel: `verteilung` erlaubt jede Stufe `"x.y"` von `"1.0"` bis `"5.0"` mit einer Nachkommastelle (Zwischenstufen, 5.5). App-Versionen bis einschließlich v0.1.0 behalten für Moduldateien mit anderen Zwischenstufen als 1,4 / 2,4 / 3,4 ihren Cache. |
+| 1.3 | Prüfungstermine: optionales Feld `pruefungen` im Manifest und die Dateien `pruefungen/<SEMESTER>.json` (5.6). App-Versionen bis einschließlich v0.2.0 ignorieren beides. |
+
+`pruefungen` listet die vorhandenen Prüfungsdateien. Die App liest eine Prüfungsdatei nur dann neu ein, wenn sich ihr `updatedAt` geändert hat. Fehlt das Feld, gibt es keine Prüfungsdaten, und die App zeigt nur eigene Termine. `datei` muss dem Muster `pruefungen/WS26-27.json` bzw. `pruefungen/SS26.json` folgen; andere Pfade liest die App nicht.
 
 ### 5.3 `regeln.json`
 
@@ -399,9 +503,87 @@ Claude setzt `art` beim Eintragen nach dieser Regel. Ist ein Termin bekannterma�
 
 Die App rechnet alle Kennzahlen selbst aus `verteilung` und `nichtErschienen` aus. Die Werte unter `tumonline` sind die abgelesenen Originalzahlen. Sie dienen Claude als **Kontrolle beim Auslesen**: Weichen die selbst berechneten Werte um mehr als 0,01 ab, hat Claude sich verlesen. Für die zusammengefasste Ansicht über alle Termine werden die Verteilungen addiert.
 
-### 5.6 Validierung
+### 5.6 `pruefungen/<SEMESTER>.json` (ab Schema 1.3)
 
-Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und einen Test, der die erfundenen Beispieldaten dagegen prüft. Max legt eine Kopie der Schemas in den Projekt-Dokumenten ab, damit Claude im Projekt seine Dateien vor dem Schreiben prüfen kann.
+Pro Semester gibt es eine Datei. Der Name kommt aus der Semesterbezeichnung: `WS 26/27` → `WS26-27.json`, `SS 26` → `SS26.json`. Die Datei enthält nur Termine von Modulen, die im Katalog stehen.
+
+Beispiel (erfunden; echte Termine gehören nicht ins öffentliche Repo):
+
+```json
+{
+  "semester": "WS 26/27",
+  "stand": "2026-10-14",
+  "quelle": "TUMonline › Prüfungen, Studienplan [20261], Semester „Alle“, Ausdruck vom 14.10.2026",
+  "termine": [
+    {
+      "id": "XX0001-2026W-1",
+      "code": "XX0001",
+      "pruefungsnummer": "XX0001",
+      "titel": "Example: Boundary Layers",
+      "art": "Modulprüfung",
+      "vorbehaltlich": false,
+      "datum": "2027-02-12",
+      "beginn": "14:00",
+      "ende": "15:30",
+      "raeume": ["Hörsaal A1"],
+      "pruefer": ["Beispiel, Hans"],
+      "anmeldungVon": "2026-11-16",
+      "anmeldungBis": "2027-01-15",
+      "abmeldungBis": "2027-02-05",
+      "alternativGruppe": null,
+      "hinweis": null
+    },
+    {
+      "id": "XX0007-2026W-1",
+      "code": "XX0007",
+      "pruefungsnummer": "XX0007",
+      "art": "Modulprüfung",
+      "vorbehaltlich": false,
+      "datum": null,
+      "beginn": null,
+      "ende": null,
+      "raeume": [],
+      "pruefer": ["Muster, Erika"],
+      "alternativGruppe": null,
+      "hinweis": "Bitte den Termin direkt beim Lehrstuhl vereinbaren."
+    }
+  ]
+}
+```
+
+| Feld | Pflicht | Bedeutung |
+|---|---|---|
+| `semester` | ja | Semester im Format des Plans. Kommt aus der TUMonline-Angabe hinter dem Titel: `2026 W` → `WS 26/27`, `2026 S` → `SS 26`. Das Datum spielt dafür keine Rolle. Muss zum Eintrag in `manifest.pruefungen` passen, sonst gilt die Datei als ungültig. |
+| `stand` | ja | ISO-Datum des Ausdrucks, aus dem die Datei stammt |
+| `quelle` | nein | Freitext |
+| `termine` | ja | Liste der Termine, darf leer sein |
+
+Pro Termin:
+
+| Feld | Pflicht | Bedeutung |
+|---|---|---|
+| `id` | ja | Eindeutig in der Datei, Format `<code>-<JJJJ><W\|S>-<n>`. n zählt die Einträge des Moduls im Semester nach Datum und Beginn. Claude hält die id über Aktualisierungen so stabil wie möglich. Die App nutzt sie als UID im Kalenderexport. |
+| `code` | ja | Modulcode im Katalog, also die Prüfungsnummer ohne Endung (`XX0002-1` → `XX0002`) |
+| `pruefungsnummer` | nein | Nummer genau wie in TUMonline |
+| `titel` | nein | Titel wie in TUMonline. Die App zeigt den Katalogtitel und nutzt diesen nur als Ersatz. |
+| `art` | nein | z. B. `Modulprüfung` oder `Fachprüfung`, wie in TUMonline |
+| `vorbehaltlich` | nein | `true`, wenn TUMonline „(vorbehaltlich)“ anzeigt. Standard `false`. |
+| `datum` | ja | ISO-Datum oder `null`, wenn TUMonline kein Datum nennt |
+| `datumBis` | nein | letzter Tag bei mehrtägigen Terminen (ISO-Datum) |
+| `beginn`, `ende` | nein | `"HH:MM"` oder `null`. Ohne Datum sind beide `null`, auch wenn TUMonline „00:00“ zeigt. |
+| `raeume` | nein | Liste der Räume wie in TUMonline. Leer, wenn „Ort nicht bekannt“ oder „noch nicht festgelegt“. |
+| `pruefer` | nein | Liste „Nachname, Vorname“ |
+| `anmeldungVon`, `anmeldungBis`, `abmeldungBis` | nein | ISO-Datum |
+| `alternativGruppe` | nein | Gleiche Zeichenkette = parallele Gruppen, man schreibt nur eine davon. Claude setzt sie, wenn dieselbe Prüfungsnummer im selben Semester mehrfach zu verschiedenen Zeiten vorkommt. Verschiedene Prüfungsnummern eines Moduls sind Teile und bekommen keine Gruppe. |
+| `hinweis` | nein | Die orange Infozeile aus TUMonline, z. B. „Please contact Prof. … for the exact appointments.“ Den Vermerk „Import“ lässt Claude weg. |
+
+Unbekannte Zusatzfelder ignoriert die App. Einträge, deren `code` nicht im Katalog steht, überspringt sie und zählt sie im Einlesebericht.
+
+### 5.7 Validierung
+
+Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und einen Test, der die erfundenen Beispieldaten dagegen prüft. Max legt eine Kopie der Schemas in den Projekt-Dokumenten ab, damit Claude im Projekt seine Dateien vor dem Schreiben prüfen kann. Ab Schema 1.3 kommen `pruefungen.schema.json` und ein erweitertes `manifest.schema.json` dazu. Ihre aktuelle Fassung liegt zur Übergabe an Claude Code in `_schema/`.
+
+Die erfundenen Beispiel-Prüfungsdateien in `examples/shared/pruefungen/` decken die Randfälle ab: drei Semester, eine `alternativGruppe`, ein Modul mit zwei Teilen (verschiedene Prüfungsnummern), einen Termin ohne Datum mit Hinweis, `vorbehaltlich`, `datumBis`, Wiederholungstermine, Module, die nur im Vorjahr einen Termin haben (Schätzung), und einen Eintrag mit unbekanntem Code.
 
 ---
 
@@ -412,6 +594,12 @@ Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und ei
 3. Neue Module: Claude sucht Modulbeschreibung, CP, Turnus, Sprache, Leitung und Links in TUMonline bzw. im Modulhandbuch, schreibt eine Kurzbeschreibung und vergibt Kategorie und Tags.
 4. Claude verschiebt die verarbeiteten Originale nach `_quellen/<CODE>/` und schreibt zum Schluss `manifest.json` mit neuem `updatedAt`.
 5. Vor jedem Semester prüft Claude `angebot` und die Links zu den Lehrveranstaltungen, weil sich die IDs in TUMonline jedes Semester ändern.
+6. **Prüfungstermine:**
+   - Max druckt in TUMonline unter „Prüfungen“ die Liste als PDF (Studienplan [20261], Semester „Alle“, sortiert nach Datum aufsteigend) und legt sie in `_exam_dates/`.
+   - Claude liest alle Einträge aus und ordnet jedem das Semester aus der TUMonline-Angabe zu. Den Modulcode gewinnt Claude aus der Prüfungsnummer ohne Endung. Übernommen werden nur Katalogmodule. Bei parallelen Gruppen setzt Claude `alternativGruppe`.
+   - Ein Ausdruck ist immer ein vollständiger Stand. Claude schreibt deshalb die betroffenen Semesterdateien komplett neu und hält dabei die `id`s stabil.
+   - Danach verschiebt Claude die PDFs nach `_quellen/_pruefungen/<Datum>/`, trägt die Dateien in `manifest.pruefungen` ein und schreibt `manifest.json` zuletzt.
+   - Große Ausdrucke verarbeitet Claude in mehreren Durchgängen, ein Semester nach dem anderen.
 
 **Erstbefüllung** aus den vorhandenen Quellen: der Modulwahl-HTML (Module im WS 26/27 und Liste fürs SS), dem Blatt „Modulkatalog“ aus `Masternote_Rechner.xlsx` und `ExamStatisticsExport.pdf` (Notenspiegel und Kommentare).
 
@@ -421,7 +609,9 @@ Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und ei
 
 - Leistungsnachweis aus TUMonline (PDF) importieren
 - Prüfungsversuche und Wiederholungen tracken (ein nicht bestandenes Modul hat nur den Status `nicht bestanden`)
-- Überschneidungen von Vorlesungs- und Prüfungsterminen
+- Überschneidungen mit Vorlesungs- und Übungsterminen (Prüfungstermine untereinander: siehe 4.8)
+- Erinnerungen an Anmelde- und Abmeldefristen für Prüfungen
+- Markierung von Prüfungsterminen, die sich seit dem letzten Einlesen geändert haben
 - Katalog in der App bearbeiten; Freunde tragen nicht selbst bei
 - Mehrere Spielstände, Rückwärtsrechnung („welche Note brauche ich“)
 - Mehrere Studiengänge oder FPSO-Versionen
@@ -440,6 +630,17 @@ Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und ei
 - **Haupt- oder Wiederholungstermin:** wird aus dem Turnus des Moduls abgeleitet (Regel in 5.5).
 - **Freunde ohne privates OneDrive:** ZIP-Download reicht als Weg. Die App zeigt das Datum des Datenstands.
 - **Persönliche Empfehlungen:** nicht in der App.
+
+## 8a. Geklärte Punkte (Version 3.3, Prüfungstermine)
+
+- **Geteilte Daten:** Prüfungstermine liegen in `shared/`, eine Datei pro Semester, nur für Katalogmodule.
+- **Vergangene Semester:** Termine ab WS 25/26 sind verfügbar und dienen als Grundlage für Schätzungen.
+- **Konflikte** zählen nur zwischen Belegungen, die im Plan im selben Semester stehen. Idee, geplant und angemeldet zählen gleich. Gelb heißt höchstens ein freier Tag dazwischen (Grenze 2, einstellbar).
+- **Schätzungen** lösen „mögliche“ Konflikte aus und werden getrennt gezählt.
+- **Wiederholungstermine** sind bei „Alle Katalogmodule“ standardmäßig ausgeblendet.
+- **Eigener Prüfungstermin** pro Belegung ist möglich.
+- **Kalenderexport** als .ics ist dabei.
+- **Ansichten:** Monat (Standard), Woche, Liste. Auf dem Termin stehen Uhrzeit, Raum, Kategorie-Farbe und Ø bestanden; die Anmeldefrist ist nur in der Detailansicht wichtig.
 
 ## 9. Offene Punkte
 
