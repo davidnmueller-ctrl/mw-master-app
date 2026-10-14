@@ -25,7 +25,7 @@ Die App ist nicht mit einem gekauften Zertifikat signiert. Deshalb kommt beim er
 - **Windows:** „Der Computer wurde durch Windows geschützt“ → **Weitere Informationen** → **Trotzdem ausführen**.
 - **macOS:** Die App in „Programme“ ziehen und öffnen. Kommt „kann nicht geöffnet werden, da der Entwickler nicht überprüft werden kann“: **Systemeinstellungen → Datenschutz & Sicherheit** → unten bei MW Master **Trotzdem öffnen**.
 
-Danach startet sie normal. Updates: Einstellungen → „Nach Updates suchen“, oder einfach die neue Setup-Datei installieren. Deine Daten bleiben dabei erhalten.
+Danach startet sie normal. Updates: Einstellungen → „Nach Updates suchen“, oder einfach die neue Setup-Datei installieren. Deine Daten bleiben dabei erhalten. Hast du noch v0.1.0, installiere die neue Version einmal von Hand (v0.1.0 kann sich nicht selbst aktualisieren); ab v0.2.0 klappt das Update in der App.
 
 ## Geteilten Ordner verknüpfen
 

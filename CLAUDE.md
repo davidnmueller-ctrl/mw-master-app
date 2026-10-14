@@ -198,8 +198,11 @@ pass `--config '{"bundle":{"createUpdaterArtifacts":false}}'`.
   `mw-master.key.pub`, endpoint with `massimomassivo`,
   `bundle.createUpdaterArtifacts: true`. Don't change the pubkey —
   installed apps would reject every later update.
-- v0.1.0 is the first release with the updater. Installs before it don't
-  exist.
+- **v0.2.0 is the first release with a working updater.** The v0.1.0 tag
+  sits on a commit before the updater was enabled (placeholder endpoint
+  `OWNER`, empty pubkey): v0.1.0 shows "Could not fetch a valid release
+  JSON from the remote" and can never update itself. v0.1.0 installs must
+  install v0.2.0 (or later) manually once; from then on the updater works.
 - Troubleshooting: `failed to decode base64 secret key: Invalid symbol 10`
   in CI means the secret has a newline. Max re-copies it with
   `(Get-Content $HOME\.tauri\mw-master.key -Raw) -replace '\s','' | Set-Clipboard`,

@@ -444,4 +444,4 @@ Das Repo enthält JSON-Schemas für alle Dateien (`schema/*.schema.json`) und ei
 ## 9. Offene Punkte
 
 - App-Icon (in v0.1.0 ein Platzhalter)
-- In-App-Updater aktivieren: Signaturschlüssel erzeugen und als GitHub-Secret hinterlegen (Anleitung in `CLAUDE.md`, Abschnitt „Releases“)
+- In-App-Updater: aktiv ab v0.2.0. v0.1.0 enthält ihn noch nicht (Platzhalter-Endpunkt, kein Schlüssel) und muss einmal von Hand auf v0.2.0 oder neuer aktualisiert werden.
