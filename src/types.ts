@@ -66,8 +66,9 @@ export interface Notenspiegel {
   pruefungsdatum?: string | null;
   angemeldet?: number;
   /**
-   * Count per grade step, keys "1.0" … "5.0" (without "nicht erschienen").
-   * "1.4", "2.4", "3.4" only occur with a grade bonus (schema 1.1).
+   * Count per grade step, keys "1.0" … "5.0" with one decimal (without
+   * "nicht erschienen"). Besides the regular steps, intermediate steps occur:
+   * "1.4", "2.4", "3.4" with a grade bonus (schema 1.1), any "x.y" since 1.2.
    */
   verteilung: Record<string, number>;
   nichtErschienen: number;

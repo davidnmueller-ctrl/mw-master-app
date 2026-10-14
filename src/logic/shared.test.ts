@@ -129,11 +129,32 @@ test("schema 1.1: grade bonus steps and notenbonus", () => {
       }),
     );
   assert.equal(modul({ verteilung: { "1.4": 3, "2.4": 2, "3.4": 1, "5.0": 1 } }).ok, true);
-  assert.equal(modul({ verteilung: { "1.5": 1 } }).ok, false);
   assert.equal(modul({}).ok, true, "notenbonus is optional");
   assert.equal(modul({ notenbonus: 0.3 }).ok, true);
   assert.equal(modul({ notenbonus: "0,3" }).ok, false);
   assert.equal(modul({ hinweis: "Bonus für Übungen" }).ok, true);
+});
+
+test("schema 1.2: any step x.y from 1.0 to 5.0", () => {
+  const verteilung = (v: Record<string, number>) =>
+    pruefe(
+      "modul",
+      JSON.stringify({
+        code: "XX9001",
+        titel: "x",
+        cp: 5,
+        kategorien: ["K"],
+        turnus: "WS",
+        notenspiegel: [{ termin: "FA 25W", semester: "WS 25/26", nichtErschienen: 0, verteilung: v }],
+      }),
+    ).ok;
+  assert.equal(verteilung({ "1.0": 14, "1.3": 5, "1.5": 4, "1.7": 5, "2.0": 3, "2.5": 2, "2.7": 2, "3.1": 2 }), true);
+  assert.equal(verteilung({ "1.1": 1, "3.9": 1, "4.1": 1, "4.9": 1, "5.0": 1 }), true);
+  for (const bad of ["0.9", "5.1", "6.0", "1", "1.50", "1,5", "01.5", " 1.5", "1.5 "]) {
+    assert.equal(verteilung({ [bad]: 1 }), false, `key ${JSON.stringify(bad)} must be rejected`);
+  }
+  assert.equal(verteilung({ "1.5": -1 }), false);
+  assert.equal(verteilung({ "1.5": 1.5 }), false);
 });
 
 test("a newer minor schema version is accepted without a warning", () => {

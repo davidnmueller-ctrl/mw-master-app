@@ -154,3 +154,37 @@ test("bonus steps are only shown when they have a count", () => {
   assert.deepEqual(s.verteilung, { "1.0": 1, "2.4": 3 });
   assert.ok(sichtbareStufen(s.verteilung).includes("2.4"));
 });
+
+// Schema 1.2: any "x.y" step between 1,0 and 5,0.
+const Z = ns("FA 26S", "SS 26", { "1.0": 14, "1.3": 5, "1.5": 4, "1.7": 5, "2.0": 3, "2.5": 2, "2.7": 2, "3.1": 2 }, 3);
+
+test("intermediate steps 1,5 / 2,5 / 3,1 count like any other step", () => {
+  const k = kennzahlen(Z);
+  assert.equal(k.angetreten, 37);
+  assert.equal(k.angemeldet, 40);
+  assert.equal(k.bestanden, 37);
+  assert.equal(k.durchfallquote, 0);
+  // 5 760 / 37 hundredths = 1.5567…
+  assert.ok(Math.abs(k.schnittGesamt! - 5760 / 3700) < 1e-12);
+  assert.equal(k.schnittGesamt!.toFixed(2), "1.56");
+  assert.equal(k.schnittBestanden!.toFixed(2), "1.56");
+  // a step above 4,0 that is not a regular one is a fail
+  const f = kennzahlen(ns("x", "SS 26", { "2.0": 3, "4.1": 1 }, 0));
+  assert.equal(f.bestanden, 3);
+  assert.equal(f.durchgefallen, 1);
+});
+
+test("intermediate steps are shown only with a count, in grade order", () => {
+  const s = sichtbareStufen(Z.verteilung);
+  assert.equal(s.length, STUFEN.length + 3);
+  assert.deepEqual(s.slice(0, 4), ["1.0", "1.3", "1.5", "1.7"]);
+  assert.deepEqual(s.slice(5, 9), ["2.3", "2.5", "2.7", "3.0"]);
+  assert.deepEqual(s.slice(9, 11), ["3.1", "3.3"]);
+  for (const st of STUFEN) assert.ok(s.includes(st), `regular step ${st} always shown`);
+  assert.deepEqual(sichtbareStufen({ "1.0": 1, "1.5": 0, "3.1": 0 }), [...STUFEN]);
+  // bonus and intermediate steps mixed, pooled over several exams
+  const p = summiere([Z, ns("B", "WS 25/26", { "1.4": 2, "2.4": 1 }, 0, { notenbonus: 0.3 })]);
+  const sp = sichtbareStufen(p.verteilung);
+  assert.deepEqual(sp.slice(1, 5), ["1.3", "1.4", "1.5", "1.7"]);
+  assert.deepEqual(sp.slice(6, 10), ["2.3", "2.4", "2.5", "2.7"]);
+});

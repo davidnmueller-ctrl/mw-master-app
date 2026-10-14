@@ -26,6 +26,26 @@
       "nichtErschienen": 2,
       "erfasstAm": "2026-10-01",
       "quelle": "erfunden"
+    },
+    {
+      "termin": "FA 26S",
+      "semester": "SS 26",
+      "pruefungsdatum": null,
+      "verteilung": {
+        "1.0": 14,
+        "1.3": 5,
+        "1.5": 4,
+        "1.7": 5,
+        "2.0": 3,
+        "2.5": 2,
+        "2.7": 2,
+        "3.1": 2
+      },
+      "nichtErschienen": 3,
+      "hinweis": "Beispiel mit Zwischenstufen (Schema 1.2).",
+      "tumonline": { "angetreten": 37, "quoteNegativ": 0, "schnittGesamt": 1.56, "schnittBestanden": 1.56 },
+      "erfasstAm": "2026-10-14",
+      "quelle": "erfunden"
     }
   ]
 }

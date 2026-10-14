@@ -158,7 +158,7 @@ Bewusst einfach: **Die App rechnet nichts zurück.** Man trägt vermutete Noten 
   - Kurzbeschreibung, Prüfungsform, Leitung, Sprache, CP, erlaubte Kategorien, Tags
   - Links: Modulbeschreibung in TUMonline und die Lehrveranstaltung pro Semester. Sie öffnen sich im Standardbrowser.
   - **Notenspiegel:** Ein Modul kann beliebig viele Notenspiegel haben, einen pro Prüfungstermin. Jeder ist datiert (Semester, Haupt- oder Wiederholungstermin, wenn bekannt auch das Prüfungsdatum).
-    - Auswahl eines Termins: Balkendiagramm über die Notenstufen 1,0 bis 5,0 plus „nicht erschienen“, mit den Kennzahlen Angemeldet, Angetreten, Ø gesamt, Ø bestanden und Durchfallquote. Die Bonus-Stufen 1,4 / 2,4 / 3,4 erscheinen nur, wenn die gezeigte Verteilung dort einen Wert > 0 hat, einsortiert zwischen die Nachbarstufen; ohne Bonus-Daten sieht das Diagramm aus wie immer. Hat der Termin `notenbonus`, steht dezent „Verteilung inkl. Notenbonus 0,3“ darunter, ein `hinweis` erscheint als kleine Notiz.
+    - Auswahl eines Termins: Balkendiagramm über die Notenstufen 1,0 bis 5,0 plus „nicht erschienen“, mit den Kennzahlen Angemeldet, Angetreten, Ø gesamt, Ø bestanden und Durchfallquote. Die Standardstufen erscheinen immer. Jede weitere Stufe (Bonus- und Zwischenstufen wie 1,4 / 1,5 / 2,4 / 3,1, siehe 5.5) erscheint nur, wenn die gezeigte Verteilung dort einen Wert > 0 hat (bei „Alle zusammen“ also, wenn irgendein Termin dort einen Wert > 0 hat), einsortiert nach Notenwert zwischen die Nachbarstufen; ohne solche Daten sieht das Diagramm aus wie immer. Hat der Termin `notenbonus`, steht dezent „Verteilung inkl. Notenbonus 0,3“ darunter, ein `hinweis` erscheint als kleine Notiz.
     - Vergleich: alle Termine als Tabelle untereinander, chronologisch sortiert. So sieht man Haupt- gegen Wiederholungstermin und die Entwicklung über die Jahre.
     - Verlauf: kleines Liniendiagramm für Ø bestanden und Durchfallquote über die Termine, ab zwei Terminen.
     - „Alle Termine zusammen“: Verteilungen addiert (Vereinigung der Stufen). Ist ein Termin mit Notenbonus dabei, steht ein kurzer Hinweis darauf da.
@@ -225,7 +225,7 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
 
 ```json
 {
-  "schemaVersion": "1.1",
+  "schemaVersion": "1.2",
   "updatedAt": "2026-10-07T18:00:00+02:00",
   "studiengang": "M.Sc. Maschinenwesen (TUM)",
   "studienplan": "20261",
@@ -241,6 +241,7 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
 |---|---|
 | 1.0 | erste Fassung |
 | 1.1 | Notenspiegel: Stufen `1.4`, `2.4`, `3.4` in `verteilung`, neue optionale Felder `notenbonus` und `hinweis` (5.5). App-Versionen bis einschließlich v0.1.0 kennen die Bonus-Stufen nicht und behalten für solche Moduldateien ihren Cache. |
+| 1.2 | Notenspiegel: `verteilung` erlaubt jede Stufe `"x.y"` von `"1.0"` bis `"5.0"` mit einer Nachkommastelle (Zwischenstufen, 5.5). App-Versionen bis einschließlich v0.1.0 behalten für Moduldateien mit anderen Zwischenstufen als 1,4 / 2,4 / 3,4 ihren Cache. |
 
 ### 5.3 `regeln.json`
 
@@ -359,13 +360,19 @@ Pflichtfelder sind `code`, `titel`, `cp`, `kategorien` und `turnus`. Alle andere
 | `art` | `Haupttermin`, `Wiederholung` oder `unbekannt`. Optional: Fehlt das Feld, leitet die App es nach der Regel unten ab. |
 | `pruefungsdatum` | ISO-Datum, falls bekannt, sonst `null` |
 
-**Notenspiegel – Verteilung und Notenbonus** (seit 1.1)
+**Notenspiegel – Verteilung, Notenbonus und Zwischenstufen** (seit 1.1, Zwischenstufen seit 1.2)
 
 | Feld | Bedeutung |
 |---|---|
-| `verteilung` | Anzahl je Notenstufe, ohne „nicht erschienen“. Erlaubte Schlüssel: `"1.0"`, `"1.3"`, `"1.7"`, `"2.0"`, `"2.3"`, `"2.7"`, `"3.0"`, `"3.3"`, `"3.7"`, `"4.0"`, `"4.3"`, `"4.7"`, `"5.0"` und zusätzlich `"1.4"`, `"2.4"`, `"3.4"`. Die drei Bonus-Stufen kommen nur vor, wenn ein Notenbonus von 0,3 eine 1,7 / 2,7 / 3,7 verbessert hat; TUMonline zeigt sie dann in der Verteilung. Werte sind ganze Zahlen ≥ 0. Stufen mit 0 dürfen fehlen. |
+| `verteilung` | Anzahl je Notenstufe, ohne „nicht erschienen“. Erlaubt ist jeder Schlüssel `"x.y"` von `"1.0"` bis `"5.0"` mit genau einer Nachkommastelle (Muster `^([1-4]\.[0-9]\|5\.0)$`; also nicht `"1.50"`, `"1,5"` oder `"5.3"`). Die Standardstufen sind `"1.0"`, `"1.3"`, `"1.7"`, `"2.0"`, `"2.3"`, `"2.7"`, `"3.0"`, `"3.3"`, `"3.7"`, `"4.0"`, `"4.3"`, `"4.7"`, `"5.0"`; alle anderen sind Zwischenstufen (siehe unten). Werte sind ganze Zahlen ≥ 0. Stufen mit 0 dürfen fehlen. |
 | `notenbonus` | Optional, Zahl > 0, z. B. `0.3`: Die Verteilung enthält bereits einen Notenbonus dieser Größe. Die App rechnet nichts heraus, sie zeigt nur einen Hinweis. |
 | `hinweis` | Optional, kurzer Text zu diesem Termin (z. B. wofür es den Bonus gab). Die App zeigt ihn in der Detailansicht als kleine Notiz. |
+
+**Zwischenstufen** (seit 1.2). TUMonline zeigt in der Verteilung jede Note, die tatsächlich vergeben wurde. Neben den Standardstufen kommen deshalb vor:
+- Bonus-Stufen `1.4`, `2.4`, `3.4` (seit 1.1): Ein Notenbonus von 0,3 hat eine 1,7 / 2,7 / 3,7 verbessert.
+- Andere Zwischenstufen wie `1.5`, `2.5`, `3.1` (seit 1.2), z. B. bei anderen Bonusregeln oder Noten aus Teilleistungen.
+
+Claude trägt jede Stufe genau so ein, wie sie im Screenshot steht. Für die Kennzahlen zählt eine Zwischenstufe wie jede andere mit ihrem Notenwert; bestanden ist alles ≤ 4,0. Beispiel (erfunden): 14×1,0, 5×1,3, 4×1,5, 5×1,7, 3×2,0, 2×2,5, 2×2,7, 2×3,1 → 37 angetreten, Ø 5 760 / 37 Hundertstel = 1,56. Im Diagramm erscheinen Zwischenstufen nur, wenn sie einen Wert > 0 haben (4.5).
 
 Die eigenen Noten (4.1) bleiben auf den Standardstufen aus `regeln.json`.
 
@@ -387,7 +394,7 @@ Claude setzt `art` beim Eintragen nach dieser Regel. Ist ein Termin bekannterma�
 | Angetreten | Σ verteilung (ohne „nicht erschienen“) |
 | Angemeldet | Angetreten + nichtErschienen |
 | Ø gesamt | Σ(Stufe × Anzahl) / Angetreten |
-| Ø bestanden | dasselbe, nur über Stufen ≤ 4,0 (Bonus-Stufen 1,4 / 2,4 / 3,4 zählen wie alle anderen) |
+| Ø bestanden | dasselbe, nur über Stufen ≤ 4,0 (Bonus- und Zwischenstufen zählen wie alle anderen) |
 | Durchfallquote | Anzahl der Stufen > 4,0 / Angetreten |
 
 Die App rechnet alle Kennzahlen selbst aus `verteilung` und `nichtErschienen` aus. Die Werte unter `tumonline` sind die abgelesenen Originalzahlen. Sie dienen Claude als **Kontrolle beim Auslesen**: Weichen die selbst berechneten Werte um mehr als 0,01 ab, hat Claude sich verlesen. Für die zusammengefasste Ansicht über alle Termine werden die Verteilungen addiert.
