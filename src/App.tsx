@@ -21,7 +21,7 @@ const NAV: { id: Seite; label: string }[] = [
 ];
 
 export default function App() {
-  const { bereit, settings, shared, einlesen } = useStore();
+  const { bereit, settings, shared, einlesen, setPruefungsAnsicht } = useStore();
   const [seite, setSeite] = useState<Seite>("noten");
 
   if (!bereit) return null;
@@ -60,7 +60,14 @@ export default function App() {
       <main className="main">
         {seite === "noten" ? <Noten /> : null}
         {seite === "spiel" ? <Spielmodus /> : null}
-        {seite === "plan" ? <Plan /> : null}
+        {seite === "plan" ? (
+          <Plan
+            zuPruefungen={(semester) => {
+              void setPruefungsAnsicht({ semester, grundlage: "plan" });
+              setSeite("pruefungen");
+            }}
+          />
+        ) : null}
         {seite === "pruefungen" ? <Pruefungen zuEinstellungen={() => setSeite("einstellungen")} /> : null}
         {seite === "katalog" ? <Katalog zuEinstellungen={() => setSeite("einstellungen")} /> : null}
         {seite === "einstellungen" ? <Einstellungen /> : null}

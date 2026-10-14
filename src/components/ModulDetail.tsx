@@ -3,17 +3,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatCp } from "../logic/noten";
 import { artVon, chronologisch, kennzahlen, summiere } from "../logic/notenspiegel";
+import { artVonTermin, formatTermin, konflikteMitPlan, planEintraege, STUFE_TEXT, termineFuer } from "../logic/pruefungen";
+import { compareSemester, parseSemester } from "../logic/semester";
 import { openUrl } from "../platform";
 import { useStore } from "../store";
 import type { Belegung, Modul } from "../types";
 import { belegungAusModul, BelegungDialog, semesterOptionen } from "./BelegungDialog";
 import { Verlauf, VerteilungChart } from "./Charts";
 import { formatDatum, formatProzent, formatSchnitt, KategorieBadge, StatusPill } from "./ui";
+import { KonfliktIcon, schaetzungsHinweis, TerminKurz, terminText } from "./Termine";
 
 const ALLE = "__alle__";
 
 export function ModulDetail({ modul, onClose }: { modul: Modul; onClose: () => void }) {
-  const { belegungen, settings, notizen, setNotiz, tags } = useStoreParts();
+  const { belegungen, settings, notizen, setNotiz, tags, pruefungen, modulMap } = useStoreParts();
   const liste = useMemo(() => chronologisch(modul.notenspiegel ?? []), [modul]);
   const [auswahl, setAuswahl] = useState<string>(liste.length ? liste.at(-1)!.termin + "|" + liste.at(-1)!.semester : ALLE);
   const [notiz, setNotizText] = useState(notizen[modul.code] ?? "");
@@ -32,6 +35,23 @@ export function ModulDetail({ modul, onClose }: { modul: Modul; onClose: () => v
   const k = gezeigt ? kennzahlen(gezeigt) : null;
 
   const tagName = (id: string) => tags.find((t) => t.id === id)?.name ?? id;
+
+  // Exam dates (4.5): real ones per semester, newest first; estimates for plan semesters without real
+  // ones come first (plan semesters lie ahead).
+  const echteSemester = Object.keys(pruefungen)
+    .filter((s) => pruefungen[s].termine.some((t) => t.code === modul.code))
+    .sort((a, b) => compareSemester(b, a));
+  const schaetzSemester = [...new Set(imPlan.map((b) => b.semester))]
+    .filter((s) => parseSemester(s) && !echteSemester.includes(s))
+    .sort((a, b) => compareSemester(b, a));
+
+  // Preview for "Zum Plan hinzufügen": date in the chosen semester and the conflicts it would cause.
+  const vorschau = useMemo(() => {
+    if (!parseSemester(semester)) return null;
+    const mt = termineFuer({ code: modul.code, semester }, pruefungen, modul);
+    const plan = planEintraege(belegungen, semester, pruefungen, modulMap);
+    return { mt, konflikte: konflikteMitPlan(mt, plan, settings.gelbGrenze, modul.code) };
+  }, [semester, modul, pruefungen, belegungen, modulMap, settings.gelbGrenze]);
 
   return (
     <div className="card detail stack-lg">
@@ -223,6 +243,54 @@ export function ModulDetail({ modul, onClose }: { modul: Modul; onClose: () => v
       ) : null}
 
       <section className="stack">
+        <h3>Prüfungstermine</h3>
+        {!echteSemester.length && !schaetzSemester.length ? <p className="small muted">Keine Prüfungstermine bekannt.</p> : null}
+        {schaetzSemester.map((s) => {
+          const mt = termineFuer({ code: modul.code, semester: s }, pruefungen, modul);
+          return (
+            <div key={s} className="stack" style={{ gap: 4 }}>
+              <div className="small">
+                <strong>{s}</strong> <span className="faint">· im Plan · {mt.herkunft === "schaetzung" ? "Schätzung" : "noch kein Termin"}</span>
+              </div>
+              {mt.termine.map((t) => (
+                <div key={t.id} className="pruef-termin small schaetzung">
+                  <span>{terminText(t)}</span>
+                  <span className="faint">{schaetzungsHinweis(t)}</span>
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {echteSemester.map((s) => {
+          const art = artVonTermin(modul.turnus, s);
+          return (
+            <div key={s} className="stack" style={{ gap: 4 }}>
+              <div className="small">
+                <strong>{s}</strong>
+                <span className="faint"> · {art === "unbekannt" ? "Art unbekannt" : art}</span>
+              </div>
+              {pruefungen[s].termine
+                .filter((t) => t.code === modul.code)
+                .map((t) => (
+                  <div key={t.id} className="pruef-termin small">
+                    <span>
+                      {formatTermin({ datum: t.datum, datumBis: t.datumBis ?? null, beginn: t.beginn ?? null, ende: t.ende ?? null })}
+                      {t.vorbehaltlich ? <span className="tag-mini">vorbehaltlich</span> : null}
+                      {t.alternativGruppe ? <span className="tag-mini" title="Parallele Gruppe – man schreibt eine davon">Gruppe</span> : null}
+                    </span>
+                    <span className="muted">
+                      {[t.raeume?.join(", "), t.pruefungsnummer, t.art].filter(Boolean).join(" · ")}
+                      {t.abmeldungBis ? ` · Abmeldung bis ${formatDatum(t.abmeldungBis)}` : ""}
+                    </span>
+                    {t.hinweis ? <span className="faint">{t.hinweis}</span> : null}
+                  </div>
+                ))}
+            </div>
+          );
+        })}
+      </section>
+
+      <section className="stack">
         <h3>Mein Plan</h3>
         {imPlan.length ? (
           imPlan.map((b) => (
@@ -246,6 +314,25 @@ export function ModulDetail({ modul, onClose }: { modul: Modul; onClose: () => v
             Zum Plan hinzufügen
           </button>
         </div>
+        {vorschau ? (
+          <div className="small stack" style={{ gap: 4 }} aria-live="polite">
+            <span>
+              Prüfung in {semester}: <TerminKurz mt={vorschau.mt} />
+            </span>
+            {vorschau.konflikte.length ? (
+              vorschau.konflikte.map((k, i) => (
+                <span key={i} className="row" style={{ gap: 6 }}>
+                  <KonfliktIcon stufe={k.stufe} moeglich={k.moeglich} />
+                  Konflikt mit {k.mit.titel}: {STUFE_TEXT[k.stufe]}
+                  {k.moeglich ? " (möglich, Schätzung)" : ""}
+                  <span className="faint">({terminText(k.b)})</span>
+                </span>
+              ))
+            ) : (
+              <span className="muted">Keine Prüfungskonflikte.</span>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="stack">
@@ -279,5 +366,13 @@ function Stat({ label, wert }: { label: string; wert: string }) {
 
 function useStoreParts() {
   const s = useStore();
-  return { belegungen: s.belegungen, settings: s.settings, notizen: s.notizen, setNotiz: s.setNotiz, tags: s.shared?.tags ?? [] };
+  return {
+    belegungen: s.belegungen,
+    settings: s.settings,
+    notizen: s.notizen,
+    setNotiz: s.setNotiz,
+    tags: s.shared?.tags ?? [],
+    pruefungen: s.pruefungen,
+    modulMap: s.modulMap,
+  };
 }

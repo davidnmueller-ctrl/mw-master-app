@@ -1,12 +1,14 @@
 // Create or edit a Belegung (a grade and a plan entry are the same record).
 import { useMemo, useState } from "react";
 import { formatCp, formatNote, istNotenstufe, kategorieVon, parseNote } from "../logic/noten";
+import { termineFuer } from "../logic/pruefungen";
 import { OHNE_TERMIN, passtZumTurnus, semesterRange, VOR_MASTER } from "../logic/semester";
 import { bestaetigen } from "../platform";
 import { useStore } from "../store";
 import type { Belegung, Modul, Settings, Status } from "../types";
 import { ERREICHT, STATUS_LABEL } from "../types";
 import { KategorieBadge, Modal } from "./ui";
+import { TerminKurz } from "./Termine";
 
 export function semesterOptionen(settings: Settings, extra = 2): { value: string; label: string }[] {
   return [
@@ -48,7 +50,7 @@ export function belegungAusModul(m: Modul, patch: Partial<Belegung> = {}): Beleg
 }
 
 export function BelegungDialog({ start, onClose }: { start: Belegung; onClose: () => void }) {
-  const { regeln, settings, shared, modulMap, belegungen, speichereBelegung, loescheBelegung } = useStore();
+  const { regeln, settings, shared, modulMap, belegungen, speichereBelegung, loescheBelegung, pruefungen } = useStore();
   const [b, setB] = useState<Belegung>(start);
   const [noteText, setNoteText] = useState(start.note100 != null ? formatNote(start.note100) : "");
   // Only an existing passed record without a grade starts as "ohne Note"; a new one expects a grade.
@@ -57,6 +59,13 @@ export function BelegungDialog({ start, onClose }: { start: Belegung; onClose: (
   const [suche, setSuche] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
+  const [termin, setTermin] = useState({
+    datum: start.eigenerTermin?.datum ?? "",
+    beginn: start.eigenerTermin?.beginn ?? "",
+    ende: start.eigenerTermin?.ende ?? "",
+    raum: start.eigenerTermin?.raum ?? "",
+  });
+  const [terminOffen, setTerminOffen] = useState(!!start.eigenerTermin);
 
   const modul = b.modulCode ? modulMap.get(b.modulCode) : undefined;
   const kat = kategorieVon(regeln, b.kategorie);
@@ -94,16 +103,28 @@ export function BelegungDialog({ start, onClose }: { start: Belegung; onClose: (
   })();
 
   const turnusHinweis = modul && !passtZumTurnus(modul.turnus, b.semester) ? `Laut Katalog läuft das Modul im ${modul.turnus}.` : null;
+  // Date from the shared data (or estimate) that an own date would replace.
+  const geteilt = termineFuer({ code: b.modulCode, semester: b.semester }, pruefungen, modul);
+  const terminFehler =
+    !termin.datum && (termin.beginn || termin.ende || termin.raum)
+      ? "Für einen eigenen Prüfungstermin fehlt das Datum"
+      : termin.beginn && termin.ende && termin.ende <= termin.beginn
+        ? "Das Ende des Prüfungstermins liegt vor dem Beginn"
+        : null;
 
   async function speichern() {
     if (!b.titel.trim()) return setFehler("Titel fehlt");
     if (!(b.cp > 0)) return setFehler("CP müssen größer als 0 sein");
     if (noteFehler) return setFehler(noteFehler);
+    if (terminFehler) return setFehler(terminFehler);
+    const eigenerTermin = termin.datum
+      ? { datum: termin.datum, beginn: termin.beginn || null, ende: termin.beginn && termin.ende ? termin.ende : null, raum: termin.raum.trim() || null }
+      : null;
     const note100 = erreicht && !ohneNote && noteText.trim() ? parseNote(noteText) : null;
     const unterbereich = kat?.unterbereiche?.length ? (b.unterbereich ?? kat.unterbereiche[0].id) : null;
     setBusy(true);
     try {
-      await speichereBelegung({ ...b, titel: b.titel.trim(), note100, unterbereich });
+      await speichereBelegung({ ...b, titel: b.titel.trim(), note100, unterbereich, eigenerTermin });
       onClose();
     } catch (e) {
       setFehler(String(e));
@@ -257,6 +278,48 @@ export function BelegungDialog({ start, onClose }: { start: Belegung; onClose: (
             {noteFehler && noteText.trim() ? <p className="small" style={{ color: "var(--bad)" }}>{noteFehler}</p> : null}
           </div>
         ) : null}
+        <div className="field full">
+          <button type="button" className="ghost small" style={{ justifySelf: "start", paddingLeft: 0 }} onClick={() => setTerminOffen(!terminOffen)} aria-expanded={terminOffen}>
+            {terminOffen ? "▾" : "▸"} Eigener Prüfungstermin {termin.datum ? `(${termin.datum.split("-").reverse().join(".")})` : "(optional)"}
+          </button>
+          {terminOffen ? (
+            <div className="stack" style={{ gap: 6 }}>
+              <span className="small muted">
+                Gilt statt der geteilten Termine und der Schätzung, z. B. für freie Einträge oder „Termin nach Absprache“.
+                {b.modulCode ? (
+                  <>
+                    {" "}
+                    Laut geteilten Daten: <TerminKurz mt={geteilt} />
+                  </>
+                ) : null}
+              </span>
+              <div className="row" style={{ gap: 8 }}>
+                <label className="field">
+                  Datum
+                  <input type="date" value={termin.datum} onChange={(e) => setTermin({ ...termin, datum: e.target.value })} />
+                </label>
+                <label className="field">
+                  Beginn
+                  <input type="time" value={termin.beginn} onChange={(e) => setTermin({ ...termin, beginn: e.target.value })} />
+                </label>
+                <label className="field">
+                  Ende
+                  <input type="time" value={termin.ende} onChange={(e) => setTermin({ ...termin, ende: e.target.value })} aria-invalid={!!terminFehler && !!termin.ende} />
+                </label>
+                <label className="field" style={{ flex: 1 }}>
+                  Raum
+                  <input value={termin.raum} onChange={(e) => setTermin({ ...termin, raum: e.target.value })} />
+                </label>
+                {termin.datum || termin.beginn || termin.ende || termin.raum ? (
+                  <button type="button" className="ghost small" style={{ alignSelf: "end" }} onClick={() => setTermin({ datum: "", beginn: "", ende: "", raum: "" })}>
+                    Entfernen
+                  </button>
+                ) : null}
+              </div>
+              {terminFehler ? <p className="small" style={{ color: "var(--bad)" }}>{terminFehler}</p> : null}
+            </div>
+          ) : null}
+        </div>
         <label className="field full">
           Notiz (privat)
           <textarea value={b.notiz} onChange={(e) => set({ notiz: e.target.value })} rows={2} />

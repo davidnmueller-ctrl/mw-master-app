@@ -10,6 +10,55 @@ export function semesterAuswahl(): string[] {
   return semesterRange("WS 23/24", 10);
 }
 
+/** Per-semester state of the exam date files (4.6). */
+function PruefungsStand() {
+  const { pruefungsBericht, shared } = useStore();
+  if (!shared) return null;
+  if (!pruefungsBericht.length) {
+    return <p className="small muted">Prüfungstermine: keine Prüfungsdaten im geteilten Ordner. Eigene Termine an den Belegungen gehen trotzdem.</p>;
+  }
+  return (
+    <div className="stack" style={{ gap: 4 }}>
+      <span className="small muted">Prüfungstermine</span>
+      <table className="small">
+        <thead>
+          <tr>
+            <th>Semester</th>
+            <th>Stand</th>
+            <th className="r">Termine</th>
+            <th>Hinweis</th>
+          </tr>
+        </thead>
+        <tbody>
+          {pruefungsBericht.map((z) => (
+            <tr key={z.semester}>
+              <td>{z.semester}</td>
+              <td>{z.stand ? formatDatum(z.stand) : "–"}</td>
+              <td className="num">{z.anzahl}</td>
+              <td className="small">
+                {z.zustand === "fehler" ? (
+                  <span style={{ color: "var(--warn)" }}>
+                    {z.fehler}
+                    {z.stand ? " – alter Stand bleibt" : ""}
+                  </span>
+                ) : z.zustand === "neu" ? (
+                  <span className="muted">neu eingelesen</span>
+                ) : null}
+                {z.unbekannteCodes.length ? (
+                  <span className="faint">
+                    {z.zustand === "fehler" || z.zustand === "neu" ? " · " : ""}
+                    {z.unbekannteCodes.length} {z.unbekannteCodes.length === 1 ? "unbekannter Code" : "unbekannte Codes"} übersprungen ({z.unbekannteCodes.join(", ")})
+                  </span>
+                ) : null}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function SharedStatus() {
   const { shared, einlesen, settings } = useStore();
   return (
@@ -34,6 +83,7 @@ export function SharedStatus() {
         <p className="small muted">Noch keine gültigen Daten gelesen.</p>
       ) : null}
       {shared?.manifest.hinweis ? <p className="small faint">{shared.manifest.hinweis}</p> : null}
+      <PruefungsStand />
       {einlesen.fehler ? <div className="notice bad">{einlesen.fehler}</div> : null}
       {einlesen.warnungen.length ? (
         <div className="notice warn">
@@ -141,6 +191,16 @@ export function Einstellungen() {
             {semesterAuswahl().map((s) => (
               <option key={s} value={s}>
                 {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field" style={{ maxWidth: 420 }}>
+          Prüfungskonflikte: „gelb“ bis zu so vielen Kalendertagen Abstand
+          <select value={settings.gelbGrenze} onChange={(e) => void setSettings({ gelbGrenze: Number(e.target.value) })}>
+            {[0, 1, 2, 3, 4, 5, 6, 7].map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? "0 – gelb aus" : n === 1 ? "1 Tag (direkt hintereinander)" : `${n} Tage${n === 2 ? " (Standard: höchstens ein freier Tag dazwischen)" : ""}`}
               </option>
             ))}
           </select>

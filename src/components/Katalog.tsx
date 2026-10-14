@@ -2,15 +2,18 @@
 import { useMemo, useState } from "react";
 import { formatCp } from "../logic/noten";
 import { referenztermin, type Referenztermin } from "../logic/notenspiegel";
+import { erstesOffenesSemester } from "../logic/pruefungsansicht";
+import { ersterTermin, termineFuer, type ModulTermine } from "../logic/pruefungen";
 import { useStore } from "../store";
 import type { Modul } from "../types";
 import { ModulDetail } from "./ModulDetail";
+import { planSemesterListe, TerminKurz } from "./Termine";
 import { formatProzent, formatSchnitt, kategorieFarbe, Kennwert, KategorieBadge, TerminHinweis } from "./ui";
 
-type SortKey = "titel" | "code" | "cp" | "turnus" | "schnitt" | "durchfall";
+type SortKey = "titel" | "code" | "cp" | "turnus" | "schnitt" | "durchfall" | "pruefung";
 
 export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
-  const { shared, belegungen, regeln } = useStore();
+  const { shared, belegungen, regeln, settings, pruefungen } = useStore();
   const [q, setQ] = useState("");
   // Category filter, multi-select. null = all categories (also covers modules with unknown categories).
   const [kats, setKats] = useState<Set<string> | null>(null);
@@ -31,6 +34,17 @@ export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
     for (const m of module) map.set(m.code, referenztermin(m));
     return map;
   }, [module]);
+
+  // Exam column: semester of the "Angebot" filter, otherwise the first plan semester that is not over.
+  const pruefSemester = useMemo(
+    () => angebot || erstesOffenesSemester(planSemesterListe(settings, belegungen), new Date().toISOString().slice(0, 10)),
+    [angebot, settings, belegungen],
+  );
+  const termine = useMemo(() => {
+    const map = new Map<string, ModulTermine>();
+    if (pruefSemester) for (const m of module) map.set(m.code, termineFuer({ code: m.code, semester: pruefSemester }, pruefungen, m));
+    return map;
+  }, [module, pruefSemester, pruefungen]);
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -55,6 +69,10 @@ export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
           return stat.get(m.code)?.kennzahlen.schnittBestanden ?? 99;
         case "durchfall":
           return stat.get(m.code)?.kennzahlen.durchfallquote ?? 99;
+        case "pruefung": {
+          const t = ersterTermin(termine.get(m.code) ?? { herkunft: "keiner", termine: [] });
+          return t?.datum ? `${t.datum}${t.beginn ?? ""}` : "~";
+        }
         default:
           return m.titel.toLowerCase();
       }
@@ -65,7 +83,7 @@ export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
       const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y), "de");
       return sort.asc ? c : -c;
     });
-  }, [module, q, kats, tag, turnus, angebot, sprache, sort, stat]);
+  }, [module, q, kats, tag, turnus, angebot, sprache, sort, stat, termine]);
 
   const mitStatistik = rows.filter((m) => stat.get(m.code)).length;
   const gefiltert = rows.length !== module.length;
@@ -207,13 +225,14 @@ export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
                   {kompakt ? null : th("turnus", "Turnus")}
                   {th("schnitt", "Ø best.", "r")}
                   {th("durchfall", "Durchfall", "r")}
+                  {pruefSemester ? th("pruefung", `Prüfung ${pruefSemester}`) : null}
                   <th className="c">Plan</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 ? (
                   <tr>
-                    <td colSpan={kompakt ? 5 : 7} className="empty">
+                    <td colSpan={(kompakt ? 5 : 7) + (pruefSemester ? 1 : 0)} className="empty">
                       {kats?.size === 0 ? "Keine Kategorie gewählt." : "Kein Modul passt zu diesen Filtern."}
                     </td>
                   </tr>
@@ -251,6 +270,11 @@ export function Katalog({ zuEinstellungen }: { zuEinstellungen: () => void }) {
                           {s ? <Kennwert r={s}>{formatProzent(s.kennzahlen.durchfallquote)}</Kennwert> : formatProzent(null)}
                           {s ? <TerminHinweis r={s} ohneWarnung /> : null}
                         </td>
+                        {pruefSemester ? (
+                          <td className="small nowrap">
+                            <TerminKurz mt={termine.get(m.code) ?? { herkunft: "keiner", termine: [] }} leer="–" />
+                          </td>
+                        ) : null}
                         <td className="c">{imPlan.has(m.code) ? "✓" : ""}</td>
                       </tr>
                     );
