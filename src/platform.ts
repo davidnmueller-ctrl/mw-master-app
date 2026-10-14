@@ -74,3 +74,29 @@ export async function suchenNachUpdate(): Promise<UpdateInfo | null> {
     },
   };
 }
+
+// ---------------- calendar export ----------------
+
+/**
+ * Save the .ics export: save dialog in the desktop app, download in the
+ * browser. Returns the path (or "Download"), null if cancelled. Never writes
+ * into the shared folder (`sharedPath`).
+ */
+export async function speichereKalender(dateiname: string, inhalt: string, sharedPath: string | null): Promise<string | null> {
+  if (!isTauri) {
+    const url = URL.createObjectURL(new Blob([inhalt], { type: "text/calendar;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = dateiname;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return "Download";
+  }
+  const d = await import("@tauri-apps/plugin-dialog");
+  const pfad = await d.save({ title: "Kalenderdatei speichern", defaultPath: dateiname, filters: [{ name: "Kalender", extensions: ["ics"] }] });
+  if (!pfad) return null;
+  const ziel = /\.ics$/i.test(pfad) ? pfad : `${pfad}.ics`;
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("ics_write", { path: ziel, content: inhalt, shared: sharedPath });
+  return ziel;
+}

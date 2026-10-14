@@ -133,6 +133,21 @@ test("the .ics file: CRLF, VTIMEZONE, TZID times, all-day dates, stable UIDs", (
   for (const z of a.split("\r\n")) assert.ok(new TextEncoder().encode(z).length <= 75);
 });
 
+test("alternatives are exported, each marked as one of the parallel groups", () => {
+  const c: PruefungsCache = {
+    "WS 26/27": {
+      ...cache["WS 26/27"],
+      termine: [
+        { id: "XX0004-2026W-1", code: "XX0004", datum: "2027-02-10", alternativGruppe: "A" },
+        { id: "XX0004-2026W-2", code: "XX0004", datum: "2027-02-22", alternativGruppe: "A" },
+      ],
+    },
+  };
+  const ev = exportEreignisse(planEintraege([belegung("XX0004")], "WS 26/27", c, new Map(), false), EXPORT_STANDARD);
+  assert.equal(ev.length, 2);
+  for (const e of ev) assert.match(e.beschreibung!, /^Parallele Gruppe: einer von 2 Terminen/);
+});
+
 test("all-day event for a single day without time", () => {
   const ics = icsDatei([{ uid: "x@mwmaster", titel: "T", datum: "2027-02-28" }], new Date(0));
   assert.match(ics, /DTSTART;VALUE=DATE:20270228\r\nDTEND;VALUE=DATE:20270301/);

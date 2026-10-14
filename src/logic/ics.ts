@@ -128,9 +128,10 @@ export interface ExportOptionen {
 
 export const EXPORT_STANDARD: ExportOptionen = { status: ["geplant", "angemeldet"], schaetzungen: true };
 
-function beschreibung(t: Termin): string {
+function beschreibung(t: Termin, alternativen: number): string {
   const q = t.quelle;
   const z: string[] = [];
+  if (alternativen > 1) z.push(`Parallele Gruppe: einer von ${alternativen} Terminen, man schreibt nur einen davon`);
   if (t.herkunft === "schaetzung" && t.vorjahr?.datum) z.push(`Schätzung – Vorjahr: ${formatTag(t.vorjahr.datum)}`);
   if (t.herkunft === "eigen") z.push("Eigener Termin");
   if (t.vorbehaltlich) z.push("vorbehaltlich");
@@ -156,7 +157,9 @@ export function exportEreignisse(eintraege: PlanEintrag[], opt: ExportOptionen):
         uid: `${t.id}@mwmaster`,
         titel: `Prüfung: ${e.titel}${t.herkunft === "schaetzung" ? " (Schätzung)" : ""}`,
         ort: t.raeume.join(", ") || undefined,
-        beschreibung: beschreibung(t) || undefined,
+        beschreibung:
+          beschreibung(t, t.alternativGruppe ? e.termine.termine.filter((x) => x.alternativGruppe === t.alternativGruppe).length : 1) ||
+          undefined,
         datum: t.datum,
         datumBis: t.datumBis,
         beginn: t.beginn,

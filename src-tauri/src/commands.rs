@@ -96,3 +96,13 @@ pub fn data_dir(app: AppHandle) -> Res<String> {
         .map(|p| p.to_string_lossy().to_string())
         .map_err(e)
 }
+
+// ---------------- calendar export ----------------
+
+/// Write the .ics export to the file chosen in the save dialog. Refuses
+/// paths inside the shared folder (`shared`, the linked path).
+#[tauri::command]
+pub fn ics_write(path: String, content: String, shared: Option<String>) -> Res<()> {
+    let shared = shared.map(PathBuf::from);
+    mwmaster_core::export::write_ics(&PathBuf::from(path), &content, shared.as_deref())
+}

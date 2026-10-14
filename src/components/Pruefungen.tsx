@@ -6,6 +6,7 @@ import { konfliktText, STUFE_TEXT, zaehleKonflikte } from "../logic/pruefungen";
 import { useStore } from "../store";
 import type { Belegung, PruefungsAnsicht } from "../types";
 import { BelegungDialog } from "./BelegungDialog";
+import { KalenderExport } from "./KalenderExport";
 import { ListenAnsicht, MonatAnsicht, monatName, montagVon, WochenAnsicht } from "./Kalender";
 import { ModulDetail } from "./ModulDetail";
 import { KonfliktIcon, planSemesterListe, terminText } from "./Termine";
@@ -43,6 +44,7 @@ export function Pruefungen({ zuEinstellungen }: { zuEinstellungen: () => void })
 
   const [detail, setDetail] = useState<string | null>(null);
   const [edit, setEdit] = useState<Belegung | null>(null);
+  const [exportOffen, setExportOffen] = useState(false);
 
   const detailModul = detail ? modulMap.get(detail) ?? null : null;
 
@@ -101,6 +103,10 @@ export function Pruefungen({ zuEinstellungen }: { zuEinstellungen: () => void })
           <span className="small muted">
             {datei ? `Termine Stand ${formatDatum(datei.stand)}` : semester ? "Noch keine Termine – nur Schätzungen" : ""}
           </span>
+          <span className="spacer" />
+          <button onClick={() => setExportOffen(true)} disabled={!semester}>
+            Als Kalenderdatei (.ics) exportieren
+          </button>
         </div>
 
         <div className="filters">
@@ -238,6 +244,7 @@ export function Pruefungen({ zuEinstellungen }: { zuEinstellungen: () => void })
       </div>
 
       {edit ? <BelegungDialog start={edit} onClose={() => setEdit(null)} /> : null}
+      {exportOffen && semester ? <KalenderExport semester={semester} onClose={() => setExportOffen(false)} /> : null}
 
     </div>
   );
