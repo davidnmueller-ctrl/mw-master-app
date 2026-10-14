@@ -16,6 +16,10 @@ A desktop app for students of the **M.Sc. Maschinenwesen at TUM**:
 3. **Semesterplan / Katalog** – shared module catalog with descriptions,
    categories, TUMonline links, exam statistics ("Notenspiegel", several
    per module) and comments; modules are planned per exam semester.
+4. **Prüfungen** – exam dates from TUMonline (one shared file per
+   semester, schema 1.3) as month/week/list, estimates from the previous
+   year, conflict levels red/orange/yellow, own exam date per Belegung,
+   .ics export (spec §4.8, §5.6).
 
 Owner: Max (chat in German). Users: Max and friends in the same programme.
 
@@ -28,7 +32,7 @@ Owner: Max (chat in German). Users: Max and friends in the same programme.
 
 | | Private | Shared |
 |---|---|---|
-| What | Belegungen (grades + plan are the same records), Spielmodus rows, private notes, settings | manifest, regeln, tags, one JSON per module |
+| What | Belegungen (grades + plan are the same records, incl. own exam date), Spielmodus rows, private notes, settings, exam view filters | manifest, regeln, tags, one JSON per module, one JSON per semester of exam dates (`pruefungen/`) |
 | Where | SQLite in the app data dir: `%APPDATA%\de.maxbergt.mwmaster\mwmaster.db` / `~/Library/Application Support/de.maxbergt.mwmaster/` | A folder the user links: Max' OneDrive `05_Master_App/shared/`, shared read-only with friends (synced or unpacked ZIP) |
 | Who writes | the app | **only Claude in the claude.ai project "Master_App"** — never the app |
 | Backups | JSON snapshot to a user-chosen folder after every change | — |
@@ -36,7 +40,9 @@ Owner: Max (chat in German). Users: Max and friends in the same programme.
 Rules that must not be broken:
 
 - **The app never writes into the shared folder.** `crates/mwmaster-core/src/shared.rs`
-  only reads. Don't add a write path, not even for Max.
+  only reads (`read_files` only accepts `pruefungen/WS26-27.json`-style
+  names). The .ics export (`export.rs`) refuses paths inside the linked
+  folder. Don't add a write path, not even for Max.
 - **No real data in this public repo.** No module catalog, no exam
   statistics, no grades. `examples/shared/` is invented sample data
   (codes `XX0001`…). Tests use invented numbers. `.gitignore` blocks the
@@ -88,11 +94,18 @@ src/
     semester.ts         "WS 26/27"/"SS 27" parsing, order, Fachsemester, Termin → semester
     shared.ts           schema validation, merge with cache, FALLBACK_REGELN
     spiel.ts            Spielmodus: rows from plan, placeholders, result
+    pruefungsdaten.ts   exam files: which to re-read (updatedAt), validation, cache merge, report
+    pruefungen.ts       exam dates of a Belegung (own > real > estimate), main/repeat, conflicts
+    pruefungsansicht.ts filters of the "Prüfungen" view, semester choice
+    ics.ts              .ics export (CRLF, folding, escaping, VTIMEZONE, stable UIDs)
     *.test.ts           node:test via tsx
   components/           Noten, Spielmodus, Plan, Katalog, ModulDetail, Charts,
-                        BelegungDialog, Struktur, Einstellungen, Einrichtung, ui
+                        BelegungDialog, Struktur, Einstellungen, Einrichtung, ui,
+                        Pruefungen + Kalender (month/week/list) + KalenderExport, Termine
 crates/mwmaster-core/   Tauri-free Rust core (builds/tests anywhere)
-  db.rs                 SQLite schema, Belegungen CRUD, kv, snapshot/restore
+  db.rs                 SQLite schema + migrations, Belegungen CRUD, kv,
+                        snapshot/restore (SCHEMA_VERSION 2, upgrade_snapshot)
+  export.rs             write the .ics export (never into the shared folder)
   backup.rs             atomic JSON backup write/read
   shared.rs             read-only access to the shared folder
 src-tauri/              Tauri shell: lib.rs (plugins, DB in AppState), commands.rs

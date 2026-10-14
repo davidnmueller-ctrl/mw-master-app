@@ -5,8 +5,9 @@ Noten, Notenspiegel und Modulplanung für den **M.Sc. Maschinenwesen an der TUM*
 - **Noten:** eigene Noten eintragen; die App rechnet den CP-gewichteten Schnitt, die Zeugnisnote (nach einer Nachkommastelle abgeschnitten), das Prädikat und prüft die CP-Struktur.
 - **Spielmodus:** Für die offenen CP vermutete Noten eintragen und sehen, welcher Schnitt dabei herauskommt.
 - **Semesterplan und Katalog:** Module aus einem gemeinsamen Katalog mit Kurzbeschreibung, Kategorie, TUMonline-Links, Notenspiegeln (auch mehrere Termine pro Modul) und Kommentaren auf die eigenen Semester verteilen.
+- **Prüfungen:** Klausurtermine aus TUMonline als Monat, Woche oder Liste, nach eigenem Plan oder nach Themen gefiltert, mit Warnung bei ungünstigen Überschneidungen und Export als Kalenderdatei.
 
-Deine Noten und dein Plan bleiben auf deinem Rechner. Katalog und Notenspiegel kommen aus einem geteilten Ordner, den die App nur liest.
+Deine Noten und dein Plan bleiben auf deinem Rechner. Katalog, Notenspiegel und Prüfungstermine kommen aus einem geteilten Ordner, den die App nur liest.
 
 > Ohne Gewähr. Rechtsverbindlich sind allein Prüfungsbescheid und Zeugnis.
 
@@ -36,6 +37,24 @@ Beim ersten Start fragt die App nach dem geteilten Ordner (geht auch später unt
 
 Gewählt werden darf der Ordner `shared` selbst oder der Ordner, der ihn enthält. Die App liest ihn bei jedem Start und zeigt unten links den **Datenstand** – so siehst du, ob deine Kopie alt ist.
 
+## Prüfungstermine
+
+Unter **Prüfungen** stehen die Klausurtermine eines Semesters. Maßgeblich ist das Semester, in dem du die Prüfung im Plan eingetragen hast – nicht das Datum (ein Termin im Oktober kann noch zum Sommersemester gehören).
+
+- **Schätzung (≈, gestrichelt):** Gibt es für ein Semester noch keine Termine, nimmt die App den Termin aus dem Vorjahr (gleiche Semesterart, gleicher Kalendertag). Der Vorjahrestermin steht im Tooltip.
+- **Konflikte** zwischen Modulen, die im selben Semester im Plan stehen (Status Idee, geplant, angemeldet):
+  - **rot:** gleicher Tag, Zeiten überschneiden sich
+  - **orange:** gleicher Tag
+  - **gelb:** höchstens zwei Kalendertage Abstand (einstellbar unter Einstellungen → Studium, 0 schaltet gelb ab)
+  - Gibt es parallele Gruppen, zählt die günstigste. Ist ein Termin nur geschätzt, heißt der Konflikt „möglich“ und ist gestrichelt.
+- **Eigener Termin:** Im Bearbeiten-Dialog einer Belegung unter „Eigener Prüfungstermin“, z. B. für Auslandskurse oder „Termin nach Absprache“. Er gilt statt der geteilten Termine.
+- Die Termine stehen auch auf den Karten im Semesterplan, in der Katalogspalte „Prüfung“ und in der Detailansicht eines Moduls. Beim „Zum Plan hinzufügen“ zeigt eine Vorschau, welche Konflikte entstehen würden.
+- **Kalenderexport:** „Als Kalenderdatei (.ics) exportieren“ speichert die Prüfungen des Semesters für Google Kalender, Outlook oder Apple Kalender. Importierst du die Datei später noch einmal, werden die Termine aktualisiert statt doppelt angelegt.
+  - Google Kalender: Einstellungen → Importieren & Exportieren → Datei auswählen.
+  - Outlook: Datei → Öffnen und exportieren → Importieren/Exportieren → iCalendar-Datei (oder die Datei einfach doppelklicken).
+
+Ohne Prüfungsdaten im geteilten Ordner zeigt die App „Keine Prüfungsdaten“; eigene Termine funktionieren trotzdem.
+
 ## Wo liegen meine Daten?
 
 - Windows: `%APPDATA%\de.maxbergt.mwmaster\mwmaster.db`
@@ -45,7 +64,10 @@ Unter Einstellungen → Meine Daten kannst du einen **Backup-Ordner** wählen (z
 
 ## Änderungen
 
+Siehe [CHANGELOG.md](CHANGELOG.md).
+
 - **Datenformat 1.1:** Notenspiegel mit Notenbonus (Stufen 1,4 / 2,4 / 3,4, Felder `notenbonus` und `hinweis`). Ältere App-Versionen halten solche Moduldateien für ungültig und zeigen für diese Module weiter den alten Stand – dann bitte die App aktualisieren.
+- **Datenformat 1.3:** Prüfungstermine (`pruefungen/<SEMESTER>.json`). Ältere App-Versionen ignorieren sie einfach.
 
 ## Entwicklung
 
