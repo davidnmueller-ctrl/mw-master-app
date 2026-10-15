@@ -2,7 +2,7 @@
 
 Versionen nach [semver](https://semver.org/lang/de/). Die Versionsnummer vergibt Max beim Release.
 
-## Unveröffentlicht
+## 0.3.0
 
 ### Neu: Prüfungstermine
 

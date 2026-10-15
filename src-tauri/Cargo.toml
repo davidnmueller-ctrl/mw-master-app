@@ -1,6 +1,6 @@
 [package]
 name = "mw-master-app"
-version = "0.2.0"
+version = "0.3.0"
 description = "Noten, Notenspiegel und Modulplanung für den M.Sc. Maschinenwesen (TUM)"
 authors = ["Maximilian Bergt"]
 edition = "2021"
