@@ -108,7 +108,7 @@ jobs:
         with:
           releaseId: ${{ needs.create-release.outputs.release_id }}
           includeUpdaterJson: true
-          args: ${{ matrix.args }}
+          args: ${{ matrix.args }} ${{ !startsWith(github.ref, 'refs/tags/v') && '--config src-tauri/tauri.preview.conf.json' || '' }}
 
       - uses: actions/upload-artifact@v4
         with:
