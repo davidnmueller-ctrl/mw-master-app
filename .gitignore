@@ -5,6 +5,10 @@ src-tauri/gen
 target
 *.log
 .DS_Store
+.env.local
+.env.*.local
+# Generated from VITE_REVIEWS_API_BASE_URL for the exact HTTP origin.
+/src-tauri/capabilities/reviews-http.json
 
 # Never commit real data. The shared catalog lives in OneDrive, private data
 # in the app data folder. Only the invented sample data in examples/ belongs here.

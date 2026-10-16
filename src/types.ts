@@ -10,6 +10,7 @@ export interface Manifest {
   studienplan?: string;
   fpso?: string;
   anzahlModule?: number;
+  moduleCodesSha256?: string;
   hinweis?: string;
   /** Exam date files (schema 1.3). Missing = no exam data. */
   pruefungen?: ManifestPruefung[];

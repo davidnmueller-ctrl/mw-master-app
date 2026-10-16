@@ -5,6 +5,7 @@
   "studienplan": "20261",
   "fpso": "FPSO Maschinenwesen (Master) vom 02.11.2023, lesbare Fassung 07.03.2024",
   "anzahlModule": 8,
+  "moduleCodesSha256": "0c96567a2e3f8325ab96190c0e6dd2ea8b895cc69d493b5b35d158280c7ffd67",
   "hinweis": "ERFUNDENE BEISPIELDATEN für Entwicklung und Tests. Keine echten Module oder Notenspiegel.",
   "pruefungen": [
     {

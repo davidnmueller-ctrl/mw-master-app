@@ -28,14 +28,14 @@ Owner: Max (chat in German). Users: Max and friends in the same programme.
 - **Platforms:** Windows ARM64, Windows x64, macOS (universal). No mobile.
 - **UI language is German.** Code, comments and commits are English.
 
-## The two kinds of data — keep them apart
+## Three kinds of data — keep them apart
 
-| | Private | Shared |
-|---|---|---|
-| What | Belegungen (grades + plan are the same records, incl. own exam date), Spielmodus rows, private notes, settings, exam view filters | manifest, regeln, tags, one JSON per module, one JSON per semester of exam dates (`pruefungen/`) |
-| Where | SQLite in the app data dir: `%APPDATA%\de.maxbergt.mwmaster\mwmaster.db` / `~/Library/Application Support/de.maxbergt.mwmaster/` | A folder the user links: Max' OneDrive `05_Master_App/shared/`, shared read-only with friends (synced or unpacked ZIP) |
-| Who writes | the app | **only Claude in the claude.ai project "Master_App"** — never the app |
-| Backups | JSON snapshot to a user-chosen folder after every change | — |
+| | Private | Shared catalog | Online reviews |
+|---|---|---|---|
+| What | Belegungen (grades + plan are the same records, incl. own exam date), Spielmodus rows, private notes, settings, exam view filters | manifest, regeln, tags, one JSON per module, one JSON per semester of exam dates (`pruefungen/`) | 1–5 star rating and optional comment per account and module |
+| Where | SQLite in the app data dir: `%APPDATA%\de.maxbergt.mwmaster\mwmaster.db` / `~/Library/Application Support/de.maxbergt.mwmaster/` | A folder the user links: Max' OneDrive `05_Master_App/shared/`, shared read-only with friends (synced or unpacked ZIP) | Separate HTTPS API backed by Firestore and Firebase Auth |
+| Who writes | the app | **only Claude in the claude.ai project "Master_App"** — never the app | Signed-in users through the API; operators moderate |
+| Backups | JSON snapshot to a user-chosen folder after every change | — | — |
 
 Rules that must not be broken:
 
@@ -43,6 +43,9 @@ Rules that must not be broken:
   only reads (`read_files` only accepts `pruefungen/WS26-27.json`-style
   names). The .ics export (`export.rs`) refuses paths inside the linked
   folder. Don't add a write path, not even for Max.
+- **Online reviews stay outside private storage and backups.** The app only
+  sends the current module code and review draft to the review API. It never
+  sends grades, exam statistics, plan rows, or private notes.
 - **No real data in this public repo.** No module catalog, no exam
   statistics, no grades. `examples/shared/` is invented sample data
   (codes `XX0001`…). Tests use invented numbers. `.gitignore` blocks the

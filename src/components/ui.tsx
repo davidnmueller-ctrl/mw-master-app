@@ -1,5 +1,6 @@
 // Small shared UI pieces.
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useStore } from "../store";
 import type { Modul, Status } from "../types";
 import { STATUS_LABEL } from "../types";
@@ -42,7 +43,7 @@ export function Modal({ titel, onClose, children, footer }: { titel: string; onC
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
-  return (
+  return createPortal(
     <div className="backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" aria-label={titel}>
         <div className="modal-head">
@@ -54,7 +55,8 @@ export function Modal({ titel, onClose, children, footer }: { titel: string; onC
         <div className="modal-body">{children}</div>
         {footer ? <div className="modal-foot">{footer}</div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -1,4 +1,5 @@
 mod commands;
+mod review_oauth;
 
 use mwmaster_core::Db;
 use std::sync::Mutex;
@@ -12,6 +13,7 @@ pub struct AppState {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -23,6 +25,7 @@ pub fn run() {
             let dir = app.path().app_data_dir()?;
             let db = Db::open(&dir.join("mwmaster.db"))?;
             app.manage(AppState { db: Mutex::new(db) });
+            app.manage(review_oauth::GoogleOAuthState::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -38,6 +41,8 @@ pub fn run() {
             commands::backup_restore,
             commands::data_dir,
             commands::ics_write,
+            review_oauth::google_oauth_sign_in,
+            review_oauth::google_oauth_cancel,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

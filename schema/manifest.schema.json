@@ -16,6 +16,7 @@
     "studienplan": { "type": "string" },
     "fpso": { "type": "string" },
     "anzahlModule": { "type": "integer", "minimum": 0 },
+    "moduleCodesSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "SHA-256 der alphabetisch sortierten Modulcodes, mit einem Zeilenumbruch zwischen den Codes. Für den sicheren Import der Online-Bewertungen erforderlich." },
     "hinweis": { "type": "string" },
     "pruefungen": {
       "type": "array",

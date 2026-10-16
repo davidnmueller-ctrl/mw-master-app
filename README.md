@@ -6,8 +6,9 @@ Noten, Notenspiegel und Modulplanung für den **M.Sc. Maschinenwesen an der TUM*
 - **Spielmodus:** Für die offenen CP vermutete Noten eintragen und sehen, welcher Schnitt dabei herauskommt.
 - **Semesterplan und Katalog:** Module aus einem gemeinsamen Katalog mit Kurzbeschreibung, Kategorie, TUMonline-Links, Notenspiegeln (auch mehrere Termine pro Modul) und Kommentaren auf die eigenen Semester verteilen.
 - **Prüfungen:** Klausurtermine aus TUMonline als Monat, Woche oder Liste, nach eigenem Plan oder nach Themen gefiltert, mit Warnung bei ungünstigen Überschneidungen und Export als Kalenderdatei.
+- **Bewertungen:** In der Moduldetailansicht 1–5 Sterne und öffentliche Kommentare anderer Studierender lesen. Mit Google-Anmeldung kannst du pro Modul eine eigene Bewertung veröffentlichen, ändern oder löschen. 5 Sterne sind am besten; diese Bewertung ist von Prüfungsnoten und Notenspiegeln getrennt.
 
-Deine Noten und dein Plan bleiben auf deinem Rechner. Katalog, Notenspiegel und Prüfungstermine kommen aus einem geteilten Ordner, den die App nur liest.
+Deine Noten und dein Plan bleiben auf deinem Rechner. Katalog, Notenspiegel und Prüfungstermine kommen aus einem geteilten Ordner, den die App nur liest. Bewertungen werden über einen separaten Onlinedienst geladen und gespeichert. Dein Name wird anderen Nutzern bei Bewertungen nicht angezeigt; die Betreiber können dein Google-Konto zur Moderation zuordnen. Die Browser-Demo (`npm run dev`) verbindet sich nicht mit dem Bewertungsdienst.
 
 > Ohne Gewähr. Rechtsverbindlich sind allein Prüfungsbescheid und Zeugnis.
 
@@ -67,11 +68,13 @@ Unter Einstellungen → Meine Daten kannst du einen **Backup-Ordner** wählen (z
 Siehe [CHANGELOG.md](CHANGELOG.md).
 
 - **Datenformat 1.1:** Notenspiegel mit Notenbonus (Stufen 1,4 / 2,4 / 3,4, Felder `notenbonus` und `hinweis`). Ältere App-Versionen halten solche Moduldateien für ungültig und zeigen für diese Module weiter den alten Stand – dann bitte die App aktualisieren.
-- **Datenformat 1.3:** Prüfungstermine (`pruefungen/<SEMESTER>.json`). Ältere App-Versionen ignorieren sie einfach.
+- **Datenformat 1.3:** Prüfungstermine (`pruefungen/<SEMESTER>.json`) und der optionale Prüfwert `moduleCodesSha256` im `shared/manifest.json`. Ältere App-Versionen ignorieren die Prüfungstermine. Der Prüfwert sichert den Import der Modulcodes für Online-Bewertungen ab; ohne ihn bleibt der bisherige Online-Katalog unverändert.
 
 ## Entwicklung
 
 Tauri 2 (Rust) + React/TypeScript. Details für Entwickler und Claude Code: [CLAUDE.md](CLAUDE.md), Spezifikation: [docs/ANFORDERUNGEN.md](docs/ANFORDERUNGEN.md).
+
+Online-Bewertungen erscheinen erst in einer konfigurierten Desktop-Version. Die nötigen Build-Einstellungen stehen in [`.env.example`](.env.example); für GitHub-Releases sind die fünf öffentlichen Werte als **GitHub Actions Repository Variables** und `VITE_GOOGLE_DESKTOP_CLIENT_SECRET` als **GitHub Actions Repository Secret** einzutragen. Die API-Adresse muss auf den bereitgestellten HTTPS-Dienst zeigen. Der Desktop-OAuth-Client benötigt beim Token-Austausch auch seinen Client-Secret-Wert. Bei installierten Apps kann dieser Wert im fertigen Programm ausgelesen werden; PKCE schützt den einzelnen Anmeldevorgang. Ein Dienstkonto-Schlüssel gehört weder in die App noch in GitHub. Fehlen Variablen, bleibt die Funktion im Build deaktiviert. Der Browser-Demo-Modus bleibt offline für Bewertungen.
 
 ```bash
 npm install

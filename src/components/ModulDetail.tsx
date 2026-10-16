@@ -1,5 +1,6 @@
 // Detail view of one catalog module: description, links, Notenspiegel
-// (per exam, comparison, trend, pooled), comments, private note, add to plan.
+// (per exam, comparison, trend, pooled), online reviews, curated comments,
+// private note, add to plan.
 import { useEffect, useMemo, useState } from "react";
 import { formatCp } from "../logic/noten";
 import { artVon, chronologisch, kennzahlen, summiere } from "../logic/notenspiegel";
@@ -10,6 +11,7 @@ import { useStore } from "../store";
 import type { Belegung, Modul } from "../types";
 import { belegungAusModul, BelegungDialog, semesterOptionen } from "./BelegungDialog";
 import { Verlauf, VerteilungChart } from "./Charts";
+import { Reviews } from "./Reviews";
 import { formatDatum, formatProzent, formatSchnitt, KategorieBadge, StatusPill } from "./ui";
 import { KonfliktIcon, schaetzungsHinweis, TerminKurz, terminText } from "./Termine";
 
@@ -227,9 +229,11 @@ export function ModulDetail({ modul, onClose }: { modul: Modul; onClose: () => v
         )}
       </section>
 
+      <Reviews code={modul.code} />
+
       {modul.kommentare?.length ? (
         <section className="stack">
-          <h3>Kommentare</h3>
+          <h3>Kommentare aus dem Katalog</h3>
           {modul.kommentare.map((c, i) => (
             <div key={i} className="comment">
               <p>{c.text}</p>

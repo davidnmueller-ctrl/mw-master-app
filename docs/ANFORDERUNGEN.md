@@ -1,6 +1,6 @@
 # MW Master App – Anforderungen
 
-Stand: 14.10.2026 · Version 3.3 der Spezifikation (Datenformat 1.3: Prüfungstermine)
+Stand: 16.10.2026 · Version 4 der Spezifikation (Datenformat 1.3: Prüfungstermine und Online-Bewertungen)
 
 Grundlage der Regeln: Studienplan **Maschinenwesen [20261]** in TUMonline (Master of Science 1630 16 400), FPSO Maschinenwesen (Master) vom 02.11.2023 in der lesbaren Fassung mit der Änderungssatzung vom 07.03.2024 und die APSO der TUM.
 
@@ -22,7 +22,7 @@ Eine Desktop-App für Studierende im **M.Sc. Maschinenwesen an der TUM** (eine F
 3. **Modulplanung:** Module aus einem gemeinsamen Katalog mit Kurzbeschreibung, Kategorie, Turnus, TUMonline-Links, Notenspiegel und Kommentaren ansehen und auf eigene Semester verteilen.
 4. **Prüfungstermine:** Klausurtermine aus TUMonline im Kalender sehen, nach eigenem Plan oder nach Themen filtern und gewarnt werden, wenn sich Prüfungen im eigenen Semesterplan ungünstig kreuzen.
 
-Nutzer sind Max und Freunde aus demselben Studiengang. Jeder hat **private Daten** (Noten, Plan, Spielstand) lokal auf dem eigenen Rechner und liest **geteilte Daten** (Katalog, Notenspiegel) aus einem OneDrive-Ordner, für den er nur Lesezugriff hat.
+Nutzer sind Max und Freunde aus demselben Studiengang. Jeder hat **private Daten** (Noten, Plan, Spielstand) lokal auf dem eigenen Rechner und liest **geteilte Daten** (Katalog, Notenspiegel) aus einem OneDrive-Ordner, für den er nur Lesezugriff hat. Online-Bewertungen sind eine getrennte, öffentliche Funktion: Lesen ohne Anmeldung, Schreiben mit Google-Anmeldung.
 
 Die Oberfläche ist **Deutsch**. Code, Kommentare und Commits sind Englisch, so wie bei der Pomodoro-App.
 
@@ -51,6 +51,9 @@ Die Oberfläche ist **Deutsch**. Code, Kommentare und Commits sind Englisch, so 
 
 GitHub (öffentliches Repo mw-master-app)
   └─ Releases: Installer + Updater-Manifest → Auto-Update in der App
+
+Separater HTTPS-Bewertungsdienst (Cloud Run, Firestore, Firebase Auth)
+  └─ 1–5 Sterne und optionale Kommentare je Modulcode; keine Noten oder Plandaten
 ```
 
 Grundregeln:
@@ -58,7 +61,7 @@ Grundregeln:
 - **Die App schreibt nie in den geteilten Ordner.** Das gilt auch auf Max' Rechner. Der Katalog wird ausschließlich über Claude im Projekt gepflegt.
 - **Die App arbeitet aus dem lokalen Cache.** Ist OneDrive offline, nur halb synchronisiert oder der Ordner nicht verknüpft, läuft die App mit dem letzten gültigen Stand weiter.
 - **Wann eingelesen wird:** bei jedem App-Start, jederzeit über den Knopf „Aktualisieren“ und, solange die App offen ist, automatisch höchstens einmal pro Stunde. Dabei wird zuerst nur `manifest.json` gelesen; die Moduldateien werden nur neu eingelesen, wenn sich `updatedAt` geändert hat. Das Einlesen ist ein reiner Lesevorgang auf lokale Dateien und dauert Millisekunden. Das Synchronisieren mit der Cloud erledigt der OneDrive-Client selbst.
-- **Private Daten verlassen den Rechner nur als Backup**, und zwar in einen Ordner, den der Nutzer selbst wählt.
+- **Noten, Plan, Spielstand und private Notizen verlassen den Rechner nur als Backup**, und zwar in einen Ordner, den der Nutzer selbst wählt. Online-Bewertungen und Anmeldetokens sind davon getrennt und werden nicht in dieses Backup oder den geteilten Ordner geschrieben.
 - **Im öffentlichen Repo liegen keine echten Daten.** Kein Katalog, keine Notenspiegel, keine Noten. Tests und Entwicklung arbeiten mit erfundenen Beispieldaten.
 
 Die geteilten Daten liegen bewusst nicht auf GitHub: Die Prüfungsstatistiken sind in TUMonline nur für eingeloggte Studierende sichtbar und sollen nicht öffentlich werden.
@@ -176,7 +179,9 @@ Bewusst einfach: **Die App rechnet nichts zurück.** Man trägt vermutete Noten 
       3. **Kleine Stichprobe:** Haben weniger als 15 Personen den Referenztermin angetreten, zeigt die App die Werte trotzdem an, aber in der Warnfarbe und mit dem Tooltip „Nur n Angetretene, wenig aussagekräftig“; neben dem Ø steht zusätzlich ein Warnsymbol (⚠). Die Schwelle ist die Konstante `MIN_ANGETRETENE` (15), Angetretene = Σ `verteilung` ohne `nichtErschienen`.
       Die Detailansicht ändert sich dadurch nicht.
     - Gibt es keine Daten, steht dort „Noch kein Notenspiegel“.
-  - **Kommentare** aus den geteilten Daten, z. B. Erfahrungsberichte von Freunden. In der App nur lesbar.
+  - **Kommentare aus dem Katalog** kommen weiterhin aus den geteilten Daten und bleiben in der App nur lesbar.
+  - **Online-Bewertungen** erscheinen als eigener Abschnitt: Durchschnitt, Anzahl und die neuesten 20 Bewertungen, deren vorhandene Kommentare anonym angezeigt werden. Die 1–5 Sterne sind ausdrücklich keine Prüfungsnoten; 5 Sterne sind am besten. Ohne Verbindung zeigt die App einen Fehler mit erneutem Laden, während Katalog und private Daten weiter nutzbar bleiben.
+  - Eine Google-Anmeldung ist erst beim eigenen Schreiben nötig. Pro Google-Konto und Modul gibt es eine Bewertung mit optionalem Kommentar; die Person kann sie ändern oder löschen. Andere Nutzer sehen keinen Namen oder Accountbezug, die Betreiber können die Konten zur Moderation zuordnen. Die Browser-Demo ruft den Onlinedienst nicht auf.
   - **Prüfungstermine:** alle bekannten echten Termine des Moduls, nach Semester gruppiert, neueste zuerst, mit Datum, Uhrzeit, Raum, Haupt- oder Wiederholungstermin, Prüfungsnummer, Art und gegebenenfalls „vorbehaltlich“ und Hinweistext. Liegt das Modul im Plan und gibt es für dessen Semester keinen echten Termin, steht dort zusätzlich die Schätzung (4.8).
   - Eigene private Notiz und der Knopf „Zum Plan hinzufügen“ mit Semesterauswahl. Nach der Wahl des Semesters zeigt eine Vorschau den Prüfungstermin dort und die Konflikte, die entstehen würden (z. B. „Konflikt mit Beispielmodul: gleicher Tag“), oder „keine Prüfungskonflikte“. Hinzufügen bleibt immer möglich.
 - Der Katalog ist in der App nicht bearbeitbar. Ein Modul, das fehlt, wird als freier Eintrag angelegt (4.1).
@@ -315,7 +320,7 @@ Alles mit führendem `_` wird **nicht** geteilt. Freigegeben wird nur `shared/`.
 
 Die App akzeptiert beides: Als Pfad darf der Ordner `shared/` selbst oder ein Ordner gewählt werden, der `shared/` enthält. In den Einstellungen und dezent in der Statusleiste zeigt die App das Datum des Datenstands (`manifest.updatedAt`). So sieht man, wenn ein heruntergeladener Stand alt ist. Die README erklärt beide Wege mit Screenshots.
 
-Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldatei steht für sich, damit OneDrive nie eine große Datei halb überträgt und Änderungen an einem Modul andere nicht berühren. Claude schreibt **`manifest.json` immer zuletzt**.
+Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldatei steht für sich, damit OneDrive nie eine große Datei halb überträgt und Änderungen an einem Modul andere nicht berühren. Claude schreibt **`manifest.json` immer zuletzt**. Vor diesem letzten Schritt berechnet es `moduleCodesSha256` aus der alphabetisch sortierten Liste aller Modulcodes, verbunden mit `\n` ohne abschließenden Zeilenumbruch. Der Online-Bewertungsimport prüft diesen Wert und aktiviert bei einer unvollständigen OneDrive-Synchronisation keine neue Codeliste.
 
 ### 5.2 `manifest.json`
 
@@ -327,6 +332,7 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
   "studienplan": "20261",
   "fpso": "FPSO Maschinenwesen (Master) vom 02.11.2023, lesbare Fassung 07.03.2024",
   "anzahlModule": 64,
+  "moduleCodesSha256": "<SHA-256 der sortierten Modulcodes>",
   "hinweis": "Gepflegt von Max Bergt. Ohne Gewähr, maßgeblich ist TUMonline.",
   "pruefungen": [
     { "semester": "WS 25/26", "datei": "pruefungen/WS25-26.json", "updatedAt": "2026-10-14T18:00:00+02:00" },
@@ -343,9 +349,11 @@ Dateien sind UTF-8, die Daten-Schlüssel deutsch und in camelCase. Jede Moduldat
 | 1.0 | erste Fassung |
 | 1.1 | Notenspiegel: Stufen `1.4`, `2.4`, `3.4` in `verteilung`, neue optionale Felder `notenbonus` und `hinweis` (5.5). App-Versionen bis einschließlich v0.1.0 kennen die Bonus-Stufen nicht und behalten für solche Moduldateien ihren Cache. |
 | 1.2 | Notenspiegel: `verteilung` erlaubt jede Stufe `"x.y"` von `"1.0"` bis `"5.0"` mit einer Nachkommastelle (Zwischenstufen, 5.5). App-Versionen bis einschließlich v0.1.0 behalten für Moduldateien mit anderen Zwischenstufen als 1,4 / 2,4 / 3,4 ihren Cache. |
-| 1.3 | Prüfungstermine: optionales Feld `pruefungen` im Manifest und die Dateien `pruefungen/<SEMESTER>.json` (5.6). App-Versionen bis einschließlich v0.2.0 ignorieren beides. |
+| 1.3 | Prüfungstermine: optionales Feld `pruefungen` im Manifest und die Dateien `pruefungen/<SEMESTER>.json` (5.6). Außerdem optionales `moduleCodesSha256` für den Online-Bewertungsimport. App-Versionen bis einschließlich v0.2.0 ignorieren die Prüfungsdaten. |
 
 `pruefungen` listet die vorhandenen Prüfungsdateien. Die App liest eine Prüfungsdatei nur dann neu ein, wenn sich ihr `updatedAt` geändert hat. Fehlt das Feld, gibt es keine Prüfungsdaten, und die App zeigt nur eigene Termine. `datei` muss dem Muster `pruefungen/WS26-27.json` bzw. `pruefungen/SS26.json` folgen; andere Pfade liest die App nicht.
+
+`moduleCodesSha256` ist ein optionaler Prüfwert für den Online-Bewertungsimport. Er wird aus der sortierten Liste aller Modulcodes berechnet; ohne ihn bleibt die bisherige Online-Codeliste unverändert.
 
 ### 5.3 `regeln.json`
 
